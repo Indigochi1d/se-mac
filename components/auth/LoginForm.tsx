@@ -1,5 +1,7 @@
 "use client";
 
+import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
@@ -16,12 +18,38 @@ export function LoginForm({
   className,
   ...props
 }: React.ComponentProps<"div">) {
-  const handleSubmitLogin = (e: React.FormEvent<HTMLFormElement>) => {
+  const router = useRouter();
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleSubmitLogin = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    setError(null);
+    setIsLoading(true);
+
     const formData = new FormData(e.currentTarget);
-    const studentId = formData.get("studentId");
-    const password = formData.get("password");
-    console.log("로그인 시도:", { studentId, password });
+    const studentId = formData.get("studentId") as string;
+    const password = formData.get("password") as string;
+
+    try {
+      const response = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ studentId, password }),
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        router.push("/");
+      } else {
+        setError(data.message);
+      }
+    } catch {
+      setError("네트워크 오류가 발생했습니다.");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -70,12 +98,16 @@ export function LoginForm({
                   className="h-11 border-gray-300 focus:border-red-500 focus:ring-red-500"
                 />
               </Field>
+              {error && (
+                <p className="text-sm text-red-600 text-center">{error}</p>
+              )}
               <Field className="pt-2">
                 <Button
                   type="submit"
-                  className="w-full h-11 bg-linear-to-r from-red-700 to-red-800 hover:from-red-800 hover:to-red-900 text-white font-semibold shadow-md transition-all duration-200"
+                  disabled={isLoading}
+                  className="w-full h-11 bg-linear-to-r from-red-700 to-red-800 hover:from-red-800 hover:to-red-900 text-white font-semibold shadow-md transition-all duration-200 disabled:opacity-50"
                 >
-                  로그인
+                  {isLoading ? "로그인 중..." : "로그인"}
                 </Button>
               </Field>
             </FieldGroup>
