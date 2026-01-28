@@ -7,6 +7,10 @@ namespace NodeJS {
     SEJONG_REDIRECT_URL: string;
     SEJONG_HEADERS_REFERER: string;
 
+    // 세종대 도서관
+    SEJONG_LIBRARY_LOGIN_URL: string;
+    SEJONG_LIBRARY_USER_FIND_URL: string;
+
     // DB
     DATABASE_URL: string;
 
