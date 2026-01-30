@@ -12,7 +12,8 @@ namespace NodeJS {
     SEJONG_LIBRARY_USER_FIND_URL: string;
 
     // DB
-    DATABASE_URL: string;
+    SUPABASE_PROJECT_URL: string;
+    SUPABASE_API_KEY: string;
 
     // 기타
     ENCRYPTION_KEY: string;
