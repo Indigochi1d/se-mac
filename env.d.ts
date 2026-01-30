@@ -14,11 +14,6 @@ namespace NodeJS {
     // DB
     DATABASE_URL: string;
 
-    // AWS
-    AWS_REGION: string;
-    AWS_ACCESS_KEY_ID: string;
-    AWS_SECRET_ACCESS_KEY: string;
-
     // 기타
     ENCRYPTION_KEY: string;
     EMAIL_USER: string;
