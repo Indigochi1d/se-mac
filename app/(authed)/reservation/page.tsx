@@ -21,8 +21,14 @@ const ReservationPage = () => {
   const [selectedDay, setSelectedDay] = useState("");
   const [startTime, setStartTime] = useState("");
   const [hours, setHours] = useState(1);
+  const [endDate, setEndDate] = useState("");
   const [companions, setCompanions] = useState<Companion[]>([]);
   const [reason, setReason] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitResult, setSubmitResult] = useState<{
+    success: boolean;
+    message: string;
+  } | null>(null);
 
   const selectedRoom = STUDY_ROOMS.find((room) => room.id === studyRoomId);
 
@@ -63,6 +69,7 @@ const ReservationPage = () => {
     if (!studyRoomId) return false;
     if (!selectedDay) return false;
     if (!startTime) return false;
+    if (!endDate) return false;
     if (!reason.trim()) return false;
 
     // 인원 검사 (본인 포함)
@@ -75,19 +82,45 @@ const ReservationPage = () => {
     return true;
   };
 
-  const handleSubmit = () => {
-    if (!isValid()) return;
+  const handleSubmit = async () => {
+    if (!isValid() || isSubmitting) return;
 
-    const reservationData = {
-      studyRoomId,
-      selectedDay,
-      startTime,
-      hours,
-      companions,
-      reason,
-    };
+    setIsSubmitting(true);
+    setSubmitResult(null);
 
-    console.log("예약 데이터:", reservationData);
+    try {
+      const response = await fetch("/api/reservations", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          studyRoomId,
+          selectedDay,
+          startTime,
+          hours,
+          companions,
+          reason,
+          endDate,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok && data.success) {
+        setSubmitResult({ success: true, message: data.message });
+      } else {
+        setSubmitResult({
+          success: false,
+          message: data.message || "예약에 실패했습니다.",
+        });
+      }
+    } catch {
+      setSubmitResult({
+        success: false,
+        message: "네트워크 오류가 발생했습니다.",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -108,6 +141,8 @@ const ReservationPage = () => {
             onStartTimeChange={handleStartTimeChange}
             hours={hours}
             onHoursChange={setHours}
+            endDate={endDate}
+            onEndDateChange={setEndDate}
           />
 
           <Separator />
@@ -128,10 +163,18 @@ const ReservationPage = () => {
             className="w-full"
             size="xl"
             onClick={handleSubmit}
-            disabled={!isValid()}
+            disabled={!isValid() || isSubmitting}
           >
-            반복 예약 등록하기
+            {isSubmitting ? "예약 등록 중..." : "반복 예약 등록하기"}
           </Button>
+
+          {submitResult && (
+            <p
+              className={`text-sm text-center ${submitResult.success ? "text-green-600" : "text-destructive"}`}
+            >
+              {submitResult.message}
+            </p>
+          )}
         </CardContent>
       </Card>
     </div>

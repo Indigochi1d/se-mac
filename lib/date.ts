@@ -39,3 +39,30 @@ export function getNextWeekDate(dayId: string): {
     day: String(targetDate.getDate()).padStart(2, "0"),
   };
 }
+
+/**
+ * 특정 요일에 해당하는 모든 날짜를 생성 (다음 주 ~ 종료일)
+ * @param dayId - 요일 ID (mon, tue, wed, thu, fri)
+ * @param endDate - 종료 날짜 (YYYY-MM-DD 형식)
+ * @returns string[] - "YYYY-MM-DD" 형식의 날짜 배열
+ */
+export function generateRecurringDates(
+  dayId: string,
+  endDate: string,
+): string[] {
+  const { year, month, day } = getNextWeekDate(dayId);
+  const current = new Date(`${year}-${month}-${day}`);
+  const end = new Date(endDate);
+
+  const dates: string[] = [];
+
+  while (current <= end) {
+    const y = current.getFullYear();
+    const m = String(current.getMonth() + 1).padStart(2, "0");
+    const d = String(current.getDate()).padStart(2, "0");
+    dates.push(`${y}-${m}-${d}`);
+    current.setDate(current.getDate() + 7);
+  }
+
+  return dates;
+}

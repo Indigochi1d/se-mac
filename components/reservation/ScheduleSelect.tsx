@@ -1,6 +1,7 @@
 "use client";
 
 import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -10,6 +11,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
+import { getNextWeekDate } from "@/lib/date";
 
 const DAYS = [
   { id: "mon", label: "월" },
@@ -37,6 +39,8 @@ interface ScheduleSelectProps {
   onStartTimeChange: (time: string) => void;
   hours: number;
   onHoursChange: (hours: number) => void;
+  endDate: string;
+  onEndDateChange: (date: string) => void;
 }
 
 export const ScheduleSelect = ({
@@ -46,9 +50,19 @@ export const ScheduleSelect = ({
   onStartTimeChange,
   hours,
   onHoursChange,
+  endDate,
+  onEndDateChange,
 }: ScheduleSelectProps) => {
   // 시작 시간이 17:00이면 1시간만 선택 가능
   const canSelectTwoHours = startTime !== "17:00";
+
+  // 종료일 최소값: 다음 주 해당 요일
+  const minEndDate = selectedDay
+    ? (() => {
+        const { year, month, day } = getNextWeekDate(selectedDay);
+        return `${year}-${month}-${day}`;
+      })()
+    : undefined;
 
   return (
     <div className="space-y-4">
@@ -109,6 +123,20 @@ export const ScheduleSelect = ({
             </Button>
           </div>
         </div>
+      </div>
+
+      <div className="space-y-2">
+        <Label>종료 날짜</Label>
+        <Input
+          type="date"
+          value={endDate}
+          onChange={(e) => onEndDateChange(e.target.value)}
+          min={minEndDate}
+          disabled={!selectedDay}
+        />
+        <p className="text-sm text-muted-foreground">
+          이 날짜까지 매주 반복 예약됩니다.
+        </p>
       </div>
 
       <p className="text-sm text-muted-foreground">
