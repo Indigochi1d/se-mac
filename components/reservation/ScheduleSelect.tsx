@@ -9,6 +9,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Button } from "@/components/ui/button";
 
 const DAYS = [
   { id: "mon", label: "월" },
@@ -18,7 +19,6 @@ const DAYS = [
   { id: "fri", label: "금" },
 ] as const;
 
-// 임시 데이터 (API 연동 전)
 const TIME_SLOTS = [
   "10:00",
   "11:00",
@@ -35,8 +35,8 @@ interface ScheduleSelectProps {
   onDayChange: (day: string) => void;
   startTime: string;
   onStartTimeChange: (time: string) => void;
-  endTime: string;
-  onEndTimeChange: (time: string) => void;
+  hours: number;
+  onHoursChange: (hours: number) => void;
 }
 
 export const ScheduleSelect = ({
@@ -44,21 +44,11 @@ export const ScheduleSelect = ({
   onDayChange,
   startTime,
   onStartTimeChange,
-  endTime,
-  onEndTimeChange,
+  hours,
+  onHoursChange,
 }: ScheduleSelectProps) => {
-  // 시작 시간 기준으로 종료 시간 옵션 생성 (최대 2시간)
-  const getEndTimeOptions = () => {
-    if (!startTime) return [];
-
-    const startIndex = TIME_SLOTS.indexOf(startTime);
-    if (startIndex === -1) return [];
-
-    // 시작 시간 이후 1~2시간 범위
-    return TIME_SLOTS.slice(startIndex + 1, startIndex + 3);
-  };
-
-  const endTimeOptions = getEndTimeOptions();
+  // 시작 시간이 17:00이면 1시간만 선택 가능
+  const canSelectTwoHours = startTime !== "17:00";
 
   return (
     <div className="space-y-4">
@@ -88,7 +78,7 @@ export const ScheduleSelect = ({
               <SelectValue placeholder="시작 시간" />
             </SelectTrigger>
             <SelectContent>
-              {TIME_SLOTS.slice(0, -1).map((time) => (
+              {TIME_SLOTS.map((time) => (
                 <SelectItem key={time} value={time}>
                   {time}
                 </SelectItem>
@@ -98,23 +88,26 @@ export const ScheduleSelect = ({
         </div>
 
         <div className="space-y-2">
-          <Label>종료 시간</Label>
-          <Select
-            value={endTime}
-            onValueChange={onEndTimeChange}
-            disabled={!startTime}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="종료 시간" />
-            </SelectTrigger>
-            <SelectContent>
-              {endTimeOptions.map((time) => (
-                <SelectItem key={time} value={time}>
-                  {time}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <Label>이용 시간</Label>
+          <div className="flex gap-2">
+            <Button
+              type="button"
+              variant={hours === 1 ? "default" : "outline"}
+              className="flex-1"
+              onClick={() => onHoursChange(1)}
+            >
+              1시간
+            </Button>
+            <Button
+              type="button"
+              variant={hours === 2 ? "default" : "outline"}
+              className="flex-1"
+              disabled={!canSelectTwoHours}
+              onClick={() => onHoursChange(2)}
+            >
+              2시간
+            </Button>
+          </div>
         </div>
       </div>
 

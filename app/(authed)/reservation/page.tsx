@@ -20,16 +20,16 @@ const ReservationPage = () => {
   const [studyRoomId, setStudyRoomId] = useState("");
   const [selectedDay, setSelectedDay] = useState("");
   const [startTime, setStartTime] = useState("");
-  const [endTime, setEndTime] = useState("");
+  const [hours, setHours] = useState(1);
   const [companions, setCompanions] = useState<Companion[]>([]);
   const [reason, setReason] = useState("");
 
   const selectedRoom = STUDY_ROOMS.find((room) => room.id === studyRoomId);
 
-  // 시작 시간 변경 시 종료 시간 초기화
+  // 시작 시간 변경 시 2시간 선택 불가하면 1시간으로 초기화
   const handleStartTimeChange = (time: string) => {
     setStartTime(time);
-    setEndTime("");
+    if (time === "17:00") setHours(1);
   };
 
   // 동반이용자 검증
@@ -62,7 +62,7 @@ const ReservationPage = () => {
   const isValid = () => {
     if (!studyRoomId) return false;
     if (!selectedDay) return false;
-    if (!startTime || !endTime) return false;
+    if (!startTime) return false;
     if (!reason.trim()) return false;
 
     // 인원 검사 (본인 포함)
@@ -82,7 +82,7 @@ const ReservationPage = () => {
       studyRoomId,
       selectedDay,
       startTime,
-      endTime,
+      hours,
       companions,
       reason,
     };
@@ -94,7 +94,7 @@ const ReservationPage = () => {
     <div className="container max-w-2xl mx-auto py-8 px-4">
       <Card>
         <CardHeader>
-          <CardTitle>스터디룸 예약</CardTitle>
+          <CardTitle>스터디룸 반복 예약</CardTitle>
         </CardHeader>
         <CardContent className="space-y-6">
           <StudyRoomSelect value={studyRoomId} onChange={setStudyRoomId} />
@@ -106,8 +106,8 @@ const ReservationPage = () => {
             onDayChange={setSelectedDay}
             startTime={startTime}
             onStartTimeChange={handleStartTimeChange}
-            endTime={endTime}
-            onEndTimeChange={setEndTime}
+            hours={hours}
+            onHoursChange={setHours}
           />
 
           <Separator />
@@ -130,7 +130,7 @@ const ReservationPage = () => {
             onClick={handleSubmit}
             disabled={!isValid()}
           >
-            예약 진행하기
+            반복 예약 등록하기
           </Button>
         </CardContent>
       </Card>
