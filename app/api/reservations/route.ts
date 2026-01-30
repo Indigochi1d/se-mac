@@ -1,7 +1,7 @@
 import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
 import { randomUUID } from "crypto";
-import sql from "@/lib/db";
+import supabase from "@/lib/db";
 import { generateRecurringDates } from "@/lib/date";
 
 interface Companion {
@@ -73,34 +73,52 @@ export async function POST(request: NextRequest) {
     // 4. group_id 생성
     const groupId = randomUUID();
 
-    // 5. 트랜잭션으로 INSERT
-    await sql.begin(async (_tx) => {
-      const tx = _tx as unknown as typeof sql;
+    // 5. 날짜별 INSERT
+    for (const date of dates) {
+      const { data: reservation, error: resError } = await supabase
+        .from("reservations")
+        .insert({
+          student_id: studentId,
+          group_id: groupId,
+          room_id: studyRoomId,
+          reservation_date: date,
+          start_time: startTime,
+          hours,
+          reason,
+          status: "pending",
+        })
+        .select("id")
+        .single();
 
-      for (const date of dates) {
-        const [reservation] = await tx`
-          INSERT INTO reservations (student_id, group_id, room_id, reservation_date, start_time, hours, reason, status)
-          VALUES (${studentId}, ${groupId}, ${studyRoomId}, ${date}, ${startTime}, ${hours}, ${reason}, 'pending')
-          RETURNING id
-        `;
-
-        const reservationId = reservation.id;
-
-        // 동반 이용자
-        for (const c of companions) {
-          await tx`
-            INSERT INTO companions (reservation_id, student_id, name, ipid)
-            VALUES (${reservationId}, ${c.studentId}, ${c.name}, ${c.ipid})
-          `;
-        }
-
-        // 인증 정보
-        await tx`
-          INSERT INTO reservation_credentials (reservation_id, student_id, password)
-          VALUES (${reservationId}, ${studentId}, ${encPassword})
-        `;
+      if (resError || !reservation) {
+        throw resError;
       }
-    });
+
+      // 동반 이용자
+      if (companions.length > 0) {
+        const { error: compError } = await supabase.from("companions").insert(
+          companions.map((c) => ({
+            reservation_id: reservation.id,
+            student_id: c.studentId,
+            name: c.name,
+            ipid: c.ipid,
+          })),
+        );
+
+        if (compError) throw compError;
+      }
+
+      // 인증 정보
+      const { error: credError } = await supabase
+        .from("reservation_credentials")
+        .insert({
+          reservation_id: reservation.id,
+          student_id: studentId,
+          password: encPassword,
+        });
+
+      if (credError) throw credError;
+    }
 
     return NextResponse.json({
       success: true,
