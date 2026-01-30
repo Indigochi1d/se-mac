@@ -1,5 +1,6 @@
 import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
+import { encrypt } from "@/lib/crypto";
 
 interface LoginRequest {
   studentId: string;
@@ -51,13 +52,17 @@ export async function POST(
     if (ssotoken) {
       // 로그인 성공 - httpOnly 쿠키에 저장
       const cookieStore = await cookies();
-      cookieStore.set("ssotoken", ssotoken, {
+      const cookieOptions = {
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",
-        sameSite: "lax",
-        maxAge: 60 * 60 * 24, // 24시간 (실제 만료 시간에 맞게 조정 필요)
+        sameSite: "lax" as const,
+        maxAge: 60 * 60 * 24,
         path: "/",
-      });
+      };
+
+      cookieStore.set("ssotoken", ssotoken, cookieOptions);
+      cookieStore.set("student_id", studentId, cookieOptions);
+      cookieStore.set("enc_password", encrypt(password), cookieOptions);
 
       return NextResponse.json({
         success: true,
