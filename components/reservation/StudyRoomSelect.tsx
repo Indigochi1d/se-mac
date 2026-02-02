@@ -16,7 +16,6 @@ export interface StudyRoom {
   maxPeople: number;
 }
 
-// 임시 데이터 (API 연동 전)
 export const STUDY_ROOMS: StudyRoom[] = [
   { id: "11", name: "스터디룸 01", minPeople: 6, maxPeople: 13 },
   { id: "10", name: "스터디룸 02", minPeople: 3, maxPeople: 6 },
