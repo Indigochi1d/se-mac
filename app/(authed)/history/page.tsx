@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Loader2, Clock, MapPin, Calendar, CalendarRange } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { ArrowLeft, Loader2, Clock, MapPin, Calendar, CalendarRange } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -36,6 +38,7 @@ const getRoomName = (roomId: string) =>
   STUDY_ROOMS.find((r) => r.id === roomId)?.name ?? `룸 ${roomId}`;
 
 const HistoryPage = () => {
+  const router = useRouter();
   const [groups, setGroups] = useState<ReservationGroup[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -60,7 +63,12 @@ const HistoryPage = () => {
     <div className="container max-w-2xl mx-auto py-8 px-4">
       <Card>
         <CardHeader>
-          <CardTitle>예약 내역</CardTitle>
+          <div className="flex items-center gap-2">
+            <Button variant="ghost" size="icon" onClick={() => router.push("/")}>
+              <ArrowLeft className="size-5" />
+            </Button>
+            <CardTitle>예약 내역</CardTitle>
+          </div>
         </CardHeader>
         <CardContent>
           {isLoading ? (

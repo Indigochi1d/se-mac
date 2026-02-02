@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { CircleCheck, CircleX } from "lucide-react";
+import { ArrowLeft, CircleCheck, CircleX } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
@@ -151,7 +151,12 @@ const ReservationPage = () => {
     <div className="container max-w-2xl mx-auto py-8 px-4">
       <Card>
         <CardHeader>
-          <CardTitle>스터디룸 반복 예약</CardTitle>
+          <div className="flex items-center gap-2">
+            <Button variant="ghost" size="icon" onClick={() => router.push("/")}>
+              <ArrowLeft className="size-5" />
+            </Button>
+            <CardTitle>스터디룸 반복 예약</CardTitle>
+          </div>
         </CardHeader>
         <CardContent className="space-y-6">
           <StudyRoomSelect value={studyRoomId} onChange={setStudyRoomId} />
