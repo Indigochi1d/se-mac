@@ -14,12 +14,10 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import {
-  StudyRoomSelect,
-  STUDY_ROOMS,
-} from "@/components/reservation/StudyRoomSelect";
+import { StudyRoomSelect } from "@/components/reservation/StudyRoomSelect";
 import { ScheduleSelect } from "@/components/reservation/ScheduleSelect";
 import { TIME_SLOTS } from "@/constants/schedule";
+import { STUDY_ROOMS } from "@/constants/studyroom";
 import {
   CompanionInput,
   type Companion,
@@ -113,7 +111,7 @@ const ReservationPage = () => {
     setSubmitResult(null);
 
     try {
-      const response = await fetch("/api/reservations", {
+      const response = await fetch("/api/reservations/reserve", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -152,7 +150,11 @@ const ReservationPage = () => {
       <Card>
         <CardHeader>
           <div className="flex items-center gap-2">
-            <Button variant="ghost" size="icon" onClick={() => router.push("/")}>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => router.push("/")}
+            >
               <ArrowLeft className="size-5" />
             </Button>
             <CardTitle>스터디룸 반복 예약</CardTitle>
@@ -196,7 +198,6 @@ const ReservationPage = () => {
           >
             {isSubmitting ? "예약 등록 중..." : "반복 예약 등록하기"}
           </Button>
-
         </CardContent>
       </Card>
 

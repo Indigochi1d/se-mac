@@ -2,7 +2,14 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Loader2, Clock, MapPin, Calendar, CalendarRange } from "lucide-react";
+import {
+  ArrowLeft,
+  Loader2,
+  Clock,
+  MapPin,
+  Calendar,
+  CalendarRange,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -12,7 +19,7 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
-import { STUDY_ROOMS } from "@/components/reservation/StudyRoomSelect";
+import { STUDY_ROOMS } from "@/constants/studyroom";
 import { formatDate, getEndTime } from "@/lib/date";
 
 interface Reservation {
@@ -64,7 +71,11 @@ const HistoryPage = () => {
       <Card>
         <CardHeader>
           <div className="flex items-center gap-2">
-            <Button variant="ghost" size="icon" onClick={() => router.push("/")}>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => router.push("/")}
+            >
               <ArrowLeft className="size-5" />
             </Button>
             <CardTitle>예약 내역</CardTitle>
