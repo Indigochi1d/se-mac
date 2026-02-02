@@ -18,19 +18,19 @@ export interface StudyRoom {
 
 // 임시 데이터 (API 연동 전)
 export const STUDY_ROOMS: StudyRoom[] = [
-  { id: "01", name: "스터디룸 01", minPeople: 6, maxPeople: 13 },
-  { id: "02", name: "스터디룸 02", minPeople: 2, maxPeople: 6 },
-  { id: "03", name: "스터디룸 03", minPeople: 2, maxPeople: 6 },
-  { id: "04", name: "스터디룸 04", minPeople: 2, maxPeople: 6 },
-  { id: "05", name: "스터디룸 05", minPeople: 2, maxPeople: 6 },
-  { id: "06", name: "스터디룸 06", minPeople: 2, maxPeople: 6 },
-  { id: "07", name: "스터디룸 07", minPeople: 2, maxPeople: 6 },
-  { id: "08", name: "스터디룸 08", minPeople: 2, maxPeople: 6 },
-  { id: "09", name: "스터디룸 09", minPeople: 2, maxPeople: 6 },
-  { id: "10", name: "스터디룸 10", minPeople: 2, maxPeople: 6 },
-  { id: "11", name: "스터디룸 11", minPeople: 2, maxPeople: 6 },
-  { id: "12", name: "스터디룸 12", minPeople: 2, maxPeople: 6 },
-  { id: "13", name: "스터디룸 13", minPeople: 2, maxPeople: 6 },
+  { id: "11", name: "스터디룸 01", minPeople: 6, maxPeople: 13 },
+  { id: "10", name: "스터디룸 02", minPeople: 2, maxPeople: 6 },
+  { id: "12", name: "스터디룸 03", minPeople: 2, maxPeople: 6 },
+  { id: "13", name: "스터디룸 04", minPeople: 2, maxPeople: 6 },
+  { id: "14", name: "스터디룸 05", minPeople: 2, maxPeople: 6 },
+  { id: "15", name: "스터디룸 06", minPeople: 2, maxPeople: 6 },
+  { id: "1", name: "스터디룸 07", minPeople: 2, maxPeople: 6 },
+  { id: "2", name: "스터디룸 08", minPeople: 2, maxPeople: 6 },
+  { id: "3", name: "스터디룸 09", minPeople: 2, maxPeople: 6 },
+  { id: "9", name: "스터디룸 10", minPeople: 2, maxPeople: 6 },
+  { id: "4", name: "스터디룸 11", minPeople: 2, maxPeople: 6 },
+  { id: "5", name: "스터디룸 12", minPeople: 2, maxPeople: 6 },
+  { id: "16", name: "스터디룸 13", minPeople: 2, maxPeople: 6 },
 ];
 
 interface StudyRoomSelectProps {
