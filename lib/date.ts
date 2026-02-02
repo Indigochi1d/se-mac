@@ -11,11 +11,13 @@ const DAY_MAP: Record<string, number> = {
  * @param dayId - 요일 ID (mon, tue, wed, thu, fri)
  * @returns { year, month, day } - 패딩된 문자열
  */
-export function getNextWeekDate(dayId: string): {
+export const getNextWeekDate = (
+  dayId: string,
+): {
   year: string;
   month: string;
   day: string;
-} {
+} => {
   const targetDayOfWeek = DAY_MAP[dayId];
   if (targetDayOfWeek === undefined) {
     throw new Error(`Invalid day ID: ${dayId}`);
@@ -38,7 +40,7 @@ export function getNextWeekDate(dayId: string): {
     month: String(targetDate.getMonth() + 1).padStart(2, "0"),
     day: String(targetDate.getDate()).padStart(2, "0"),
   };
-}
+};
 
 /**
  * 특정 요일에 해당하는 모든 날짜를 생성 (다음 주 ~ 종료일)
@@ -46,10 +48,10 @@ export function getNextWeekDate(dayId: string): {
  * @param endDate - 종료 날짜 (YYYY-MM-DD 형식)
  * @returns string[] - "YYYY-MM-DD" 형식의 날짜 배열
  */
-export function generateRecurringDates(
+export const generateRecurringDates = (
   dayId: string,
   endDate: string,
-): string[] {
+): string[] => {
   const { year, month, day } = getNextWeekDate(dayId);
   const current = new Date(`${year}-${month}-${day}`);
   const end = new Date(endDate);
@@ -65,4 +67,18 @@ export function generateRecurringDates(
   }
 
   return dates;
-}
+};
+
+export const formatDate = (dateStr: string) => {
+  const date = new Date(dateStr + "T00:00:00");
+  return date.toLocaleDateString("ko-KR", {
+    month: "numeric",
+    day: "numeric",
+    weekday: "short",
+  });
+};
+
+export const getEndTime = (startTime: string, hours: number) => {
+  const [h, m] = startTime.split(":").map(Number);
+  return `${String(h + hours).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+};
