@@ -9,6 +9,7 @@ import {
   STUDY_ROOMS,
 } from "@/components/reservation/StudyRoomSelect";
 import { ScheduleSelect } from "@/components/reservation/ScheduleSelect";
+import { TIME_SLOTS } from "@/constants/schedule";
 import {
   CompanionInput,
   type Companion,
@@ -33,9 +34,10 @@ const ReservationPage = () => {
   const selectedRoom = STUDY_ROOMS.find((room) => room.id === studyRoomId);
 
   // 시작 시간 변경 시 2시간 선택 불가하면 1시간으로 초기화
+  const lastSlot = TIME_SLOTS[TIME_SLOTS.length - 1];
   const handleStartTimeChange = (time: string) => {
     setStartTime(time);
-    if (time === "17:00") setHours(1);
+    if (time === lastSlot) setHours(1);
   };
 
   // 동반이용자 검증

@@ -12,25 +12,7 @@ import {
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { getNextWeekDate } from "@/lib/date";
-
-const DAYS = [
-  { id: "mon", label: "월" },
-  { id: "tue", label: "화" },
-  { id: "wed", label: "수" },
-  { id: "thu", label: "목" },
-  { id: "fri", label: "금" },
-] as const;
-
-const TIME_SLOTS = [
-  "10:00",
-  "11:00",
-  "12:00",
-  "13:00",
-  "14:00",
-  "15:00",
-  "16:00",
-  "17:00",
-];
+import { DAYS, TIME_SLOTS } from "@/constants/schedule";
 
 interface ScheduleSelectProps {
   selectedDay: string;
@@ -53,8 +35,8 @@ export const ScheduleSelect = ({
   endDate,
   onEndDateChange,
 }: ScheduleSelectProps) => {
-  // 시작 시간이 17:00이면 1시간만 선택 가능
-  const canSelectTwoHours = startTime !== "17:00";
+  const lastSlot = TIME_SLOTS[TIME_SLOTS.length - 1];
+  const canSelectTwoHours = startTime !== lastSlot;
 
   // 종료일 최소값: 다음 주 해당 요일
   const minEndDate = selectedDay
