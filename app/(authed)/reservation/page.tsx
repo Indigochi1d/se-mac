@@ -1,9 +1,19 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { CircleCheck, CircleX } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   StudyRoomSelect,
   STUDY_ROOMS,
@@ -18,6 +28,7 @@ import { ReasonInput } from "@/components/reservation/ReasonInput";
 import { getNextWeekDate } from "@/lib/date";
 
 const ReservationPage = () => {
+  const router = useRouter();
   const [studyRoomId, setStudyRoomId] = useState("");
   const [selectedDay, setSelectedDay] = useState("");
   const [startTime, setStartTime] = useState("");
@@ -30,6 +41,17 @@ const ReservationPage = () => {
     success: boolean;
     message: string;
   } | null>(null);
+
+  const handleResetForm = () => {
+    setStudyRoomId("");
+    setSelectedDay("");
+    setStartTime("");
+    setHours(1);
+    setEndDate("");
+    setCompanions([]);
+    setReason("");
+    setSubmitResult(null);
+  };
 
   const selectedRoom = STUDY_ROOMS.find((room) => room.id === studyRoomId);
 
@@ -170,15 +192,37 @@ const ReservationPage = () => {
             {isSubmitting ? "예약 등록 중..." : "반복 예약 등록하기"}
           </Button>
 
-          {submitResult && (
-            <p
-              className={`text-sm text-center ${submitResult.success ? "text-green-600" : "text-destructive"}`}
-            >
-              {submitResult.message}
-            </p>
-          )}
         </CardContent>
       </Card>
+
+      <Dialog
+        open={submitResult !== null}
+        onOpenChange={(open) => {
+          if (!open) setSubmitResult(null);
+        }}
+      >
+        <DialogContent showCloseButton={false}>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              {submitResult?.success ? (
+                <CircleCheck className="size-5 text-green-600" />
+              ) : (
+                <CircleX className="size-5 text-destructive" />
+              )}
+              {submitResult?.success ? "예약 등록 완료" : "예약 등록 실패"}
+            </DialogTitle>
+            <DialogDescription>{submitResult?.message}</DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={handleResetForm}>
+              다시 예약하기
+            </Button>
+            <Button onClick={() => router.push("/history")}>
+              예약 확인하러 가기
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
