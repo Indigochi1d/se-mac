@@ -43,9 +43,6 @@ export async function DELETE(request: NextRequest) {
       .eq("id", reservationId)
       .single();
 
-    console.log("[Cancel] reservation:", reservation);
-    console.log("[Cancel] queryError:", queryError);
-
     if (queryError || !reservation) {
       return NextResponse.json(
         { success: false, message: "예약을 찾을 수 없습니다." },
@@ -77,12 +74,8 @@ export async function DELETE(request: NextRequest) {
     }
 
     // 6. booking_id가 있으면 도서관 취소 API 호출 (status와 관계없이)
-    console.log("[Cancel] reservation.status:", reservation.status);
-    console.log("[Cancel] reservation.booking_id:", reservation.booking_id);
 
     if (reservation.booking_id) {
-      console.log("[Cancel] booking_id exists, calling library cancel API...");
-
       // 비밀번호 복호화
       const cred = reservation.reservation_credentials;
       const credRecord = Array.isArray(cred) ? cred[0] : cred;
@@ -115,8 +108,6 @@ export async function DELETE(request: NextRequest) {
 
       // 도서관 로그인으로 JSESSIONID 획득
       const jsessionId = await loginToLibrary(newSsotoken);
-      console.log("[Cancel] jsessionId:", jsessionId);
-
       // 도서관 취소 요청
       const cancelFormData = new URLSearchParams({
         cancelMsg: cancelMsg,
@@ -126,8 +117,6 @@ export async function DELETE(request: NextRequest) {
         mode: "update",
         classId: "0",
       });
-
-      console.log("[Cancel] cancelFormData:", cancelFormData.toString());
 
       const cancelResponse = await fetch(
         process.env.SEJONG_LIBRARY_RESERVE_PROCESS_URL!,
@@ -144,10 +133,6 @@ export async function DELETE(request: NextRequest) {
       // 취소 결과 확인
       const xJson = cancelResponse.headers.get("X-JSON");
       const responseBody = await cancelResponse.text();
-
-      console.log("[Cancel] cancelResponse.status:", cancelResponse.status);
-      console.log("[Cancel] X-JSON:", xJson);
-      console.log("[Cancel] responseBody:", responseBody);
 
       if (!xJson || !xJson.includes("true")) {
         return NextResponse.json(
