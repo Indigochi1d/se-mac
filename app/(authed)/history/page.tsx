@@ -41,7 +41,7 @@ const STATUS_CONFIG = {
   pending: { label: "대기", variant: "outline" as const },
   success: { label: "완료", variant: "default" as const },
   failed: { label: "실패", variant: "destructive" as const },
-  cancelled: { label: "취소", variant: "secondary" as const },
+  cancelled: { label: "취소됨", variant: "secondary" as const },
 } as const;
 
 const getRoomName = (roomId: string) =>
@@ -70,6 +70,10 @@ const HistoryPage = () => {
   useEffect(() => {
     fetchHistory();
   }, []);
+
+  const activeGroups = groups.filter(
+    (group) => !group.reservations.every((r) => r.status === "cancelled")
+  );
 
   const handleCancel = async (reservationId: number) => {
     if (cancellingId) return;
@@ -115,13 +119,13 @@ const HistoryPage = () => {
             <div className="flex justify-center py-8">
               <Loader2 className="size-6 animate-spin text-muted-foreground" />
             </div>
-          ) : groups.length === 0 ? (
+          ) : activeGroups.length === 0 ? (
             <p className="text-muted-foreground text-center py-8">
               예약 내역이 없습니다.
             </p>
           ) : (
             <Accordion type="multiple" className="w-full">
-              {groups.map((group) => {
+              {activeGroups.map((group) => {
                 const successCount = group.reservations.filter(
                   (r) => r.status === "success",
                 ).length;
