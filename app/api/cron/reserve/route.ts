@@ -11,15 +11,20 @@ export async function GET(request: NextRequest) {
   // 1. CRON_SECRET 검증
   const authHeader = request.headers.get("authorization");
   if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
-    return NextResponse.json({ success: false, message: "Unauthorized" }, { status: 401 });
+    return NextResponse.json(
+      { success: false, message: "Unauthorized" },
+      { status: 401 },
+    );
   }
 
   // 2. 타겟 날짜 계산 (KST 기준 오늘 + 7일)
   const now = new Date();
-  const kstDate = new Date(now.getTime() + 9 * 60 * 60 * 1000);
-  kstDate.setDate(kstDate.getDate() + TARGET_DATE_OFFSET);
+  const kstNow = new Date(
+    now.toLocaleString("en-US", { timeZone: "Asia/Seoul" }),
+  );
+  kstNow.setDate(kstNow.getDate() + TARGET_DATE_OFFSET);
 
-  const targetDate = `${kstDate.getFullYear()}-${String(kstDate.getMonth() + 1).padStart(2, "0")}-${String(kstDate.getDate()).padStart(2, "0")}`;
+  const targetDate = `${kstNow.getFullYear()}-${String(kstNow.getMonth() + 1).padStart(2, "0")}-${String(kstNow.getDate()).padStart(2, "0")}`;
 
   // 3. DB에서 pending 예약 조회
   const { data: reservations, error: queryError } = await supabase
@@ -79,7 +84,11 @@ export async function GET(request: NextRequest) {
     if (!credRecord?.password) {
       for (const res of studentReservations) {
         await markFailed(res.id, "자격 증명 정보 없음");
-        results.push({ reservationId: res.id, status: "failed", message: "자격 증명 없음" });
+        results.push({
+          reservationId: res.id,
+          status: "failed",
+          message: "자격 증명 없음",
+        });
       }
       continue;
     }
@@ -90,7 +99,11 @@ export async function GET(request: NextRequest) {
     } catch {
       for (const res of studentReservations) {
         await markFailed(res.id, "비밀번호 복호화 실패");
-        results.push({ reservationId: res.id, status: "failed", message: "복호화 실패" });
+        results.push({
+          reservationId: res.id,
+          status: "failed",
+          message: "복호화 실패",
+        });
       }
       continue;
     }
@@ -102,7 +115,11 @@ export async function GET(request: NextRequest) {
     } catch {
       for (const res of studentReservations) {
         await markFailed(res.id, "포탈 로그인 요청 실패");
-        results.push({ reservationId: res.id, status: "failed", message: "포탈 로그인 실패" });
+        results.push({
+          reservationId: res.id,
+          status: "failed",
+          message: "포탈 로그인 실패",
+        });
       }
       continue;
     }
@@ -110,7 +127,11 @@ export async function GET(request: NextRequest) {
     if (!ssotoken) {
       for (const res of studentReservations) {
         await markFailed(res.id, "포탈 로그인 실패 - 비밀번호 변경 가능성");
-        results.push({ reservationId: res.id, status: "failed", message: "ssotoken 획득 실패" });
+        results.push({
+          reservationId: res.id,
+          status: "failed",
+          message: "ssotoken 획득 실패",
+        });
       }
       continue;
     }
@@ -122,7 +143,11 @@ export async function GET(request: NextRequest) {
     } catch {
       for (const res of studentReservations) {
         await markFailed(res.id, "도서관 로그인 실패");
-        results.push({ reservationId: res.id, status: "failed", message: "도서관 로그인 실패" });
+        results.push({
+          reservationId: res.id,
+          status: "failed",
+          message: "도서관 로그인 실패",
+        });
       }
       continue;
     }
@@ -151,14 +176,23 @@ export async function GET(request: NextRequest) {
         });
 
         if (result.success) {
-          await updateStatus(res.id, "success");
-          results.push({ reservationId: res.id, status: "success", message: result.message });
+          await updateStatus(res.id, "success", undefined, result.bookingId);
+          results.push({
+            reservationId: res.id,
+            status: "success",
+            message: result.message,
+          });
         } else {
           await markFailed(res.id, result.message);
-          results.push({ reservationId: res.id, status: "failed", message: result.message });
+          results.push({
+            reservationId: res.id,
+            status: "failed",
+            message: result.message,
+          });
         }
       } catch (error) {
-        const message = error instanceof Error ? error.message : "알 수 없는 에러";
+        const message =
+          error instanceof Error ? error.message : "알 수 없는 에러";
         await markFailed(res.id, message);
         results.push({ reservationId: res.id, status: "failed", message });
       }
@@ -172,17 +206,27 @@ export async function GET(request: NextRequest) {
   return NextResponse.json({
     success: true,
     targetDate,
-    summary: { total: results.length, success: successCount, failed: failedCount },
+    summary: {
+      total: results.length,
+      success: successCount,
+      failed: failedCount,
+    },
     results,
   });
 }
 
-async function updateStatus(reservationId: number, status: string, errorMessage?: string) {
+async function updateStatus(
+  reservationId: number,
+  status: string,
+  errorMessage?: string,
+  bookingId?: string,
+) {
   await supabase
     .from("reservations")
     .update({
       status,
       ...(errorMessage && { error_message: errorMessage }),
+      ...(bookingId && { booking_id: bookingId }),
     })
     .eq("id", reservationId);
 }

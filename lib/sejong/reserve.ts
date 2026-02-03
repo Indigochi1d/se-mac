@@ -1,13 +1,7 @@
 /**
  * 세종대 도서관 스터디룸 예약 제출 로직
- * Python create_reservation 함수를 TypeScript로 포팅
  */
 import * as cheerio from "cheerio";
-
-const STUDYROOM_RESERVE_URL =
-  "https://library.sejong.ac.kr/studyroom/Request.ax?roomId=";
-const STUDYROOM_BOOKING_PROCESS_URL =
-  "https://library.sejong.ac.kr/studyroom/BookingProcess.axa";
 
 interface Companion {
   student_id: string;
@@ -31,6 +25,68 @@ interface ReservationParams {
 interface ReservationResult {
   success: boolean;
   message: string;
+  bookingId?: string;
+}
+
+/**
+ * 스터디룸 메인 페이지에서 예약 목록을 파싱하여 bookingId 조회
+ * cheerio 대신 정규식 사용 (HTML 오류로 인한 파싱 문제 우회)
+ */
+async function fetchBookingId(
+  ssotoken: string,
+  roomId: string,
+  year: string,
+  month: string,
+  day: string,
+  startHour: string,
+): Promise<string | undefined> {
+  // 도서관 로그인하여 세션 쿠키 획득
+  const loginResponse = await fetch(process.env.SEJONG_LIBRARY_LOGIN_URL!, {
+    headers: {
+      Cookie: `ssotoken=${ssotoken}`,
+    },
+    redirect: "manual",
+  });
+
+  const libraryCookies = loginResponse.headers.getSetCookie();
+  const cookieHeader = libraryCookies.map((c) => c.split(";")[0]).join("; ");
+
+  // 메인 페이지 조회 (ssotoken도 함께 전달)
+  const response = await fetch(process.env.SEJONG_LIBRARY_STUDYROOM_URL!, {
+    headers: {
+      Cookie: `ssotoken=${ssotoken}; ${cookieHeader}`,
+    },
+  });
+
+  const html = await response.text();
+
+  // HTML 날짜 형식: 2026/02/10 (슬래시)
+  const targetDate = `${year}/${month.padStart(2, "0")}/${day.padStart(2, "0")}`;
+  const targetTime = `${startHour.padStart(2, "0")}:00`;
+
+  // 정규식으로 각 <tr> 블록 추출
+  const trPattern = /<tr[^>]*>[\s\S]*?<\/tr>/gi;
+  const trMatches = html.match(trPattern) || [];
+
+  for (const trContent of trMatches) {
+    // goStudyRoomBookingDetail('bookingId','ipid','roomId') 패턴 추출
+    const detailMatch = trContent.match(
+      /goStudyRoomBookingDetail\('(\d+)','(\d+)','(\d+)'\)/,
+    );
+    if (!detailMatch) continue;
+
+    const [, rowBookingId, , rowRoomId] = detailMatch;
+
+    // roomId 확인
+    if (rowRoomId !== roomId) continue;
+
+    // 날짜/시간 확인 (2026/02/10 14:00 형식)
+    if (trContent.includes(targetDate) && trContent.includes(targetTime)) {
+      return rowBookingId;
+    }
+  }
+
+  return undefined;
 }
 
 /**
@@ -41,12 +97,15 @@ async function fetchFormFields(
   jsessionId: string,
   roomId: string,
 ): Promise<Record<string, string>> {
-  const response = await fetch(STUDYROOM_RESERVE_URL + roomId, {
-    method: "GET",
-    headers: {
-      Cookie: `ssotoken=${ssotoken}; JSESSIONID=${jsessionId}`,
+  const response = await fetch(
+    process.env.SEJONG_STUDYROOM_RESERVE_URL + roomId,
+    {
+      method: "GET",
+      headers: {
+        Cookie: `ssotoken=${ssotoken}; JSESSIONID=${jsessionId}`,
+      },
     },
-  });
+  );
 
   const html = await response.text();
   const $ = cheerio.load(html);
@@ -103,7 +162,7 @@ export async function submitReservation(
   formFields["mode"] = "INSERT";
 
   // 4. 예약 제출
-  const response = await fetch(STUDYROOM_BOOKING_PROCESS_URL, {
+  const response = await fetch(process.env.SEJONG_LIBRARY_RESERVE_PROCESS_URL, {
     method: "POST",
     headers: {
       "Content-Type": "application/x-www-form-urlencoded",
@@ -116,7 +175,22 @@ export async function submitReservation(
   const xJson = response.headers.get("X-JSON");
 
   if (xJson && xJson.includes("true")) {
-    return { success: true, message: "예약이 완료되었습니다." };
+    // 6. 예약 성공 시 메인 페이지에서 bookingId 조회
+
+    const bookingId = await fetchBookingId(
+      ssotoken,
+      roomId,
+      year,
+      month,
+      day,
+      startHour,
+    );
+
+    return {
+      success: true,
+      message: "예약이 완료되었습니다.",
+      bookingId,
+    };
   }
 
   const body = await response.text();

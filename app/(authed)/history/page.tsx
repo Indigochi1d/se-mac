@@ -23,8 +23,10 @@ import { STUDY_ROOMS } from "@/constants/studyroom";
 import { formatDate, getEndTime } from "@/lib/date";
 
 interface Reservation {
+  id: number;
   date: string;
-  status: "pending" | "success" | "failed";
+  status: "pending" | "success" | "failed" | "cancelled";
+  bookingId: string | null;
 }
 
 interface ReservationGroup {
@@ -39,6 +41,7 @@ const STATUS_CONFIG = {
   pending: { label: "대기", variant: "outline" as const },
   success: { label: "완료", variant: "default" as const },
   failed: { label: "실패", variant: "destructive" as const },
+  cancelled: { label: "취소", variant: "secondary" as const },
 } as const;
 
 const getRoomName = (roomId: string) =>
@@ -48,23 +51,49 @@ const HistoryPage = () => {
   const router = useRouter();
   const [groups, setGroups] = useState<ReservationGroup[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [cancellingId, setCancellingId] = useState<number | null>(null);
+
+  const fetchHistory = async () => {
+    try {
+      const res = await fetch("/api/history");
+      const data = await res.json();
+      if (data.success) {
+        setGroups(data.data);
+      }
+    } catch {
+      // TODO: 에러 처리
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const fetchHistory = async () => {
-      try {
-        const res = await fetch("/api/history");
-        const data = await res.json();
-        if (data.success) {
-          setGroups(data.data);
-        }
-      } catch {
-        // TODO: 에러 처리
-      } finally {
-        setIsLoading(false);
-      }
-    };
     fetchHistory();
   }, []);
+
+  const handleCancel = async (reservationId: number) => {
+    if (cancellingId) return;
+
+    setCancellingId(reservationId);
+    try {
+      const res = await fetch("/api/reservations/cancel", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reservationId }),
+      });
+
+      const data = await res.json();
+      if (data.success) {
+        await fetchHistory();
+      } else {
+        alert(data.message);
+      }
+    } catch {
+      alert("예약 취소 중 오류가 발생했습니다.");
+    } finally {
+      setCancellingId(null);
+    }
+  };
 
   return (
     <div className="container max-w-2xl mx-auto py-8 px-4">
@@ -142,9 +171,30 @@ const HistoryPage = () => {
                                   <Calendar className="size-3.5 text-muted-foreground" />
                                   {formatDate(reservation.date)}
                                 </span>
-                                <Badge variant={config.variant}>
-                                  {config.label}
-                                </Badge>
+                                <div className="flex items-center gap-2">
+                                  <Badge variant={config.variant}>
+                                    {config.label}
+                                  </Badge>
+                                  {(reservation.status === "pending" ||
+                                    reservation.status === "success") && (
+                                    <Button
+                                      variant="destructive"
+                                      size="sm"
+                                      className="h-7 px-2 text-xs"
+                                      disabled={cancellingId === reservation.id}
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleCancel(reservation.id);
+                                      }}
+                                    >
+                                      {cancellingId === reservation.id ? (
+                                        <Loader2 className="size-3 animate-spin" />
+                                      ) : (
+                                        "예약 취소"
+                                      )}
+                                    </Button>
+                                  )}
+                                </div>
                               </div>
                             );
                           })}

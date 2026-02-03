@@ -17,7 +17,7 @@ export async function GET() {
     const { data, error } = await supabase
       .from("reservations")
       .select(
-        "group_id, room_id, reservation_date, start_time, hours, status",
+        "id, group_id, room_id, reservation_date, start_time, hours, status, booking_id",
       )
       .eq("student_id", studentId)
       .order("reservation_date", { ascending: true });
@@ -33,8 +33,10 @@ export async function GET() {
         startTime: string;
         hours: number;
         reservations: {
+          id: number;
           date: string;
           status: string;
+          bookingId: string | null;
         }[];
       }
     >();
@@ -53,8 +55,10 @@ export async function GET() {
       }
 
       groupMap.get(gid)!.reservations.push({
+        id: row.id,
         date: row.reservation_date,
         status: row.status,
+        bookingId: row.booking_id,
       });
     }
 

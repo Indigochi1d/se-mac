@@ -1,17 +1,12 @@
 import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
-import * as cheerio from "cheerio";
+import supabase from "@/lib/db";
+import { decrypt } from "@/lib/crypto";
+import { loginToPortal, loginToLibrary } from "@/lib/sejong/auth";
 
 interface CancelRequest {
-  bookingId: string;
-  roomId: string;
+  reservationId: number;
   cancelMsg?: string;
-}
-
-interface Reservation {
-  bookingId: string;
-  ipid: string;
-  roomId: string;
 }
 
 export async function DELETE(request: NextRequest) {
@@ -30,100 +25,150 @@ export async function DELETE(request: NextRequest) {
 
     // 2. 요청 바디 파싱
     const body: CancelRequest = await request.json();
-    const { bookingId, roomId, cancelMsg = "잘못 예약" } = body;
+    const { reservationId, cancelMsg = "예약 취소" } = body;
 
-    if (!bookingId || !roomId) {
+    if (!reservationId) {
       return NextResponse.json(
-        { success: false, message: "bookingId와 roomId는 필수입니다." },
+        { success: false, message: "reservationId는 필수입니다." },
         { status: 400 },
       );
     }
 
-    // 3. 도서관 로그인 (ssotoken 쿠키 전달)
-    const loginResponse = await fetch(process.env.SEJONG_LIBRARY_LOGIN_URL!, {
-      headers: {
-        Cookie: `ssotoken=${ssotoken}`,
-      },
-      redirect: "manual",
-    });
+    // 3. DB에서 예약 정보 조회 (credentials 포함)
+    const { data: reservation, error: queryError } = await supabase
+      .from("reservations")
+      .select(
+        "id, status, booking_id, room_id, student_id, reservation_credentials ( password )",
+      )
+      .eq("id", reservationId)
+      .single();
 
-    // 도서관 세션 쿠키 추출
-    const libraryCookies = loginResponse.headers.getSetCookie();
-    const cookieHeader = libraryCookies
-      .map((c) => c.split(";")[0])
-      .join("; ");
+    console.log("[Cancel] reservation:", reservation);
+    console.log("[Cancel] queryError:", queryError);
 
-    // 4. 스터디룸 메인 페이지 접근하여 예약 내역 파싱
-    const studyroomResponse = await fetch(
-      process.env.SEJONG_LIBRARY_STUDYROOM_URL!,
-      {
-        headers: {
-          Cookie: cookieHeader,
-        },
-      },
-    );
-
-    const html = await studyroomResponse.text();
-    const $ = cheerio.load(html);
-
-    // 예약 내역 테이블 파싱
-    const reservations: Reservation[] = [];
-    const table = $("table.tb01.width-full").last();
-    const rows = table.find("tr").slice(1); // 헤더 제외
-
-    rows.each((_, row) => {
-      const anchor = $(row).find("a");
-      const href = anchor.attr("href");
-
-      if (href) {
-        const parts = href.split("'");
-        if (parts.length >= 6) {
-          reservations.push({
-            bookingId: parts[1],
-            ipid: parts[3],
-            roomId: parts[5],
-          });
-        }
-      }
-    });
-
-    if (reservations.length === 0) {
-      return NextResponse.json(
-        { success: false, message: "현재 스터디룸 예약 내역이 없습니다." },
-        { status: 400 },
-      );
-    }
-
-    // 5. 해당 bookingId가 존재하는지 확인
-    const targetReservation = reservations.find(
-      (r) => r.bookingId === bookingId,
-    );
-
-    if (!targetReservation) {
+    if (queryError || !reservation) {
       return NextResponse.json(
         { success: false, message: "예약을 찾을 수 없습니다." },
         { status: 404 },
       );
     }
 
-    // 6. 예약 취소 요청
-    const cancelFormData = new URLSearchParams({
-      cancelMsg: cancelMsg,
-      bookingId: bookingId,
-      expired: "C",
-      roomId: roomId,
-      mode: "update",
-      classId: "0",
-    });
+    // 4. 본인 예약인지 확인
+    if (reservation.student_id !== studentId) {
+      return NextResponse.json(
+        { success: false, message: "본인의 예약만 취소할 수 있습니다." },
+        { status: 403 },
+      );
+    }
 
-    await fetch(process.env.SEJONG_LIBRARY_BOOKING_PROCESS_URL!, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/x-www-form-urlencoded",
-        Cookie: cookieHeader,
-      },
-      body: cancelFormData.toString(),
-    });
+    // 5. 상태별 분기 처리
+    if (reservation.status === "cancelled") {
+      return NextResponse.json(
+        { success: false, message: "이미 취소된 예약입니다." },
+        { status: 400 },
+      );
+    }
+
+    if (reservation.status === "failed") {
+      return NextResponse.json(
+        { success: false, message: "실패한 예약은 취소할 수 없습니다." },
+        { status: 400 },
+      );
+    }
+
+    // 6. booking_id가 있으면 도서관 취소 API 호출 (status와 관계없이)
+    console.log("[Cancel] reservation.status:", reservation.status);
+    console.log("[Cancel] reservation.booking_id:", reservation.booking_id);
+
+    if (reservation.booking_id) {
+      console.log("[Cancel] booking_id exists, calling library cancel API...");
+
+      // 비밀번호 복호화
+      const cred = reservation.reservation_credentials;
+      const credRecord = Array.isArray(cred) ? cred[0] : cred;
+
+      if (!credRecord?.password) {
+        return NextResponse.json(
+          { success: false, message: "자격 증명 정보가 없습니다." },
+          { status: 400 },
+        );
+      }
+
+      let plainPassword: string;
+      try {
+        plainPassword = decrypt(credRecord.password);
+      } catch {
+        return NextResponse.json(
+          { success: false, message: "비밀번호 복호화 실패" },
+          { status: 500 },
+        );
+      }
+
+      // 포탈 로그인으로 새 ssotoken 획득
+      const newSsotoken = await loginToPortal(studentId, plainPassword);
+      if (!newSsotoken) {
+        return NextResponse.json(
+          { success: false, message: "포탈 로그인 실패" },
+          { status: 401 },
+        );
+      }
+
+      // 도서관 로그인으로 JSESSIONID 획득
+      const jsessionId = await loginToLibrary(newSsotoken);
+      console.log("[Cancel] jsessionId:", jsessionId);
+
+      // 도서관 취소 요청
+      const cancelFormData = new URLSearchParams({
+        cancelMsg: cancelMsg,
+        bookingId: reservation.booking_id,
+        expired: "C",
+        roomId: reservation.room_id,
+        mode: "update",
+        classId: "0",
+      });
+
+      console.log("[Cancel] cancelFormData:", cancelFormData.toString());
+
+      const cancelResponse = await fetch(
+        process.env.SEJONG_LIBRARY_RESERVE_PROCESS_URL!,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/x-www-form-urlencoded",
+            Cookie: `ssotoken=${newSsotoken}; JSESSIONID=${jsessionId}`,
+          },
+          body: cancelFormData.toString(),
+        },
+      );
+
+      // 취소 결과 확인
+      const xJson = cancelResponse.headers.get("X-JSON");
+      const responseBody = await cancelResponse.text();
+
+      console.log("[Cancel] cancelResponse.status:", cancelResponse.status);
+      console.log("[Cancel] X-JSON:", xJson);
+      console.log("[Cancel] responseBody:", responseBody);
+
+      if (!xJson || !xJson.includes("true")) {
+        return NextResponse.json(
+          {
+            success: false,
+            message: responseBody.trim() || "도서관 예약 취소에 실패했습니다.",
+          },
+          { status: 400 },
+        );
+      }
+    }
+
+    // 7. DB 상태 업데이트 (pending, success 모두)
+    const { error: updateError } = await supabase
+      .from("reservations")
+      .update({ status: "cancelled" })
+      .eq("id", reservationId);
+
+    if (updateError) {
+      throw updateError;
+    }
 
     return NextResponse.json({
       success: true,
