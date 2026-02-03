@@ -19,8 +19,16 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { STUDY_ROOMS } from "@/constants/studyroom";
-import { formatDate, getEndTime } from "@/lib/date";
+import { formatDate, getEndTime, isFutureReservation } from "@/lib/date";
 
 interface Reservation {
   id: number;
@@ -39,7 +47,7 @@ interface ReservationGroup {
 
 const STATUS_CONFIG = {
   pending: { label: "대기", variant: "outline" as const },
-  success: { label: "완료", variant: "default" as const },
+  success: { label: "완료", variant: "success" as const },
   failed: { label: "실패", variant: "destructive" as const },
   cancelled: { label: "취소됨", variant: "secondary" as const },
 } as const;
@@ -47,11 +55,18 @@ const STATUS_CONFIG = {
 const getRoomName = (roomId: string) =>
   STUDY_ROOMS.find((r) => r.id === roomId)?.name ?? `룸 ${roomId}`;
 
+interface CancelTarget {
+  reservation: Reservation;
+  startTime: string;
+  type: "library" | "pending";
+}
+
 const HistoryPage = () => {
   const router = useRouter();
   const [groups, setGroups] = useState<ReservationGroup[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [cancellingId, setCancellingId] = useState<number | null>(null);
+  const [cancelTarget, setCancelTarget] = useState<CancelTarget | null>(null);
 
   const fetchHistory = async () => {
     try {
@@ -75,10 +90,20 @@ const HistoryPage = () => {
     (group) => !group.reservations.every((r) => r.status === "cancelled")
   );
 
-  const handleCancel = async (reservationId: number) => {
-    if (cancellingId) return;
+  const openCancelModal = (reservation: Reservation, startTime: string) => {
+    const isFuture = isFutureReservation(reservation.date, startTime);
+    const type: CancelTarget["type"] =
+      reservation.status === "success" && isFuture ? "library" : "pending";
 
+    setCancelTarget({ reservation, startTime, type });
+  };
+
+  const confirmCancel = async () => {
+    if (!cancelTarget || cancellingId) return;
+
+    const reservationId = cancelTarget.reservation.id;
     setCancellingId(reservationId);
+
     try {
       const res = await fetch("/api/reservations/cancel", {
         method: "DELETE",
@@ -89,6 +114,7 @@ const HistoryPage = () => {
       const data = await res.json();
       if (data.success) {
         await fetchHistory();
+        setCancelTarget(null);
       } else {
         alert(data.message);
       }
@@ -180,7 +206,8 @@ const HistoryPage = () => {
                                     {config.label}
                                   </Badge>
                                   {(reservation.status === "pending" ||
-                                    reservation.status === "success") && (
+                                    (reservation.status === "success" &&
+                                      isFutureReservation(reservation.date, group.startTime))) && (
                                     <Button
                                       variant="destructive"
                                       size="sm"
@@ -188,7 +215,7 @@ const HistoryPage = () => {
                                       disabled={cancellingId === reservation.id}
                                       onClick={(e) => {
                                         e.stopPropagation();
-                                        handleCancel(reservation.id);
+                                        openCancelModal(reservation, group.startTime);
                                       }}
                                     >
                                       {cancellingId === reservation.id ? (
@@ -211,6 +238,39 @@ const HistoryPage = () => {
           )}
         </CardContent>
       </Card>
+
+      <Dialog open={!!cancelTarget} onOpenChange={(open) => !open && setCancelTarget(null)}>
+        <DialogContent showCloseButton={false}>
+          <DialogHeader>
+            <DialogTitle>예약 취소</DialogTitle>
+            <DialogDescription>
+              {cancelTarget?.type === "library"
+                ? "학술정보원에 예약된 건을 취소하시겠어요?"
+                : "등록된 예약을 취소하시겠어요?"}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setCancelTarget(null)}
+              disabled={!!cancellingId}
+            >
+              아니요
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={confirmCancel}
+              disabled={!!cancellingId}
+            >
+              {cancellingId ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : (
+                "취소하기"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

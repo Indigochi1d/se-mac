@@ -82,3 +82,14 @@ export const getEndTime = (startTime: string, hours: number) => {
   const [h, m] = startTime.split(":").map(Number);
   return `${String(h + hours).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
 };
+
+/**
+ * 예약일시가 현재 시점보다 미래인지 확인
+ * @param date - 예약 날짜 (YYYY-MM-DD 형식)
+ * @param startTime - 시작 시간 (HH:mm 형식)
+ * @returns boolean - 미래이면 true
+ */
+export const isFutureReservation = (date: string, startTime: string): boolean => {
+  const reservationDateTime = new Date(`${date}T${startTime}:00`);
+  return reservationDateTime > new Date();
+};
