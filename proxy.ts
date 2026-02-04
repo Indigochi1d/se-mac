@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
-export function middleware(request: NextRequest) {
+export default function proxy(request: NextRequest) {
   const ssotoken = request.cookies.get("ssotoken");
   const { pathname } = request.nextUrl;
   const isLoginPage = pathname === "/login";
