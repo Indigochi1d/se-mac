@@ -155,6 +155,12 @@ export async function DELETE(request: NextRequest) {
       throw updateError;
     }
 
+    // 8. 슬롯 점유 해제
+    await supabase
+      .from("reserved_slots")
+      .delete()
+      .eq("reservation_id", reservationId);
+
     return NextResponse.json({
       success: true,
       message: "예약이 취소되었습니다.",

@@ -233,4 +233,9 @@ async function updateStatus(
 
 async function markFailed(reservationId: number, errorMessage: string) {
   await updateStatus(reservationId, "failed", errorMessage);
+  // 실패한 예약의 슬롯 점유 해제
+  await supabase
+    .from("reserved_slots")
+    .delete()
+    .eq("reservation_id", reservationId);
 }

@@ -5,6 +5,7 @@ import supabase from "@/lib/db";
 import { generateRecurringDates } from "@/lib/date";
 import { loginToLibrary } from "@/lib/sejong/auth";
 import { submitReservation } from "@/lib/sejong/reserve";
+import { generateSlotTimes } from "@/lib/slot";
 
 interface Companion {
   studentId: string;
@@ -39,9 +40,24 @@ export async function POST(request: NextRequest) {
 
     // 2. 요청 바디 파싱 및 검증
     const body: ReservationRequest = await request.json();
-    const { studyRoomId, selectedDay, startTime, hours, companions, reason, endDate } = body;
+    const {
+      studyRoomId,
+      selectedDay,
+      startTime,
+      hours,
+      companions,
+      reason,
+      endDate,
+    } = body;
 
-    if (!studyRoomId || !selectedDay || !startTime || !hours || !reason || !endDate) {
+    if (
+      !studyRoomId ||
+      !selectedDay ||
+      !startTime ||
+      !hours ||
+      !reason ||
+      !endDate
+    ) {
       return NextResponse.json(
         { success: false, message: "필수 정보가 누락되었습니다." },
         { status: 400 },
@@ -50,7 +66,10 @@ export async function POST(request: NextRequest) {
 
     if (![1, 2].includes(hours)) {
       return NextResponse.json(
-        { success: false, message: "이용 시간은 1시간 또는 2시간만 가능합니다." },
+        {
+          success: false,
+          message: "이용 시간은 1시간 또는 2시간만 가능합니다.",
+        },
         { status: 400 },
       );
     }
@@ -67,7 +86,10 @@ export async function POST(request: NextRequest) {
 
     if (dates.length === 0) {
       return NextResponse.json(
-        { success: false, message: "예약할 날짜가 없습니다. 종료 날짜를 확인해주세요." },
+        {
+          success: false,
+          message: "예약할 날짜가 없습니다. 종료 날짜를 확인해주세요.",
+        },
         { status: 400 },
       );
     }
@@ -116,6 +138,31 @@ export async function POST(request: NextRequest) {
       }
 
       reservationMap.set(date, reservation.id);
+
+      // 슬롯 점유 등록
+      const slotTimes = generateSlotTimes(startTime, hours);
+      const { error: slotError } = await supabase.from("reserved_slots").insert(
+        slotTimes.map((time) => ({
+          room_id: studyRoomId,
+          slot_date: date,
+          slot_time: time,
+          reservation_id: reservation.id,
+        })),
+      );
+
+      if (slotError) {
+        console.error(slotError);
+        // UNIQUE 제약조건 위반 = 이미 점유된 슬롯
+        // 방금 생성한 reservation을 정리하고 에러 반환
+        await supabase.from("reservations").delete().eq("id", reservation.id);
+        return NextResponse.json(
+          {
+            success: false,
+            message: `${date} ${startTime} 시간대는 이미 예약되어 있습니다.`,
+          },
+          { status: 409 },
+        );
+      }
 
       // 동반 이용자
       if (companions.length > 0) {
@@ -194,6 +241,10 @@ export async function POST(request: NextRequest) {
                 .from("reservations")
                 .update({ status: "failed", error_message: result.message })
                 .eq("id", reservationId);
+              await supabase
+                .from("reserved_slots")
+                .delete()
+                .eq("reservation_id", reservationId);
               immediateResults.push({
                 date,
                 status: "failed",
@@ -207,6 +258,10 @@ export async function POST(request: NextRequest) {
               .from("reservations")
               .update({ status: "failed", error_message: message })
               .eq("id", reservationId);
+            await supabase
+              .from("reserved_slots")
+              .delete()
+              .eq("reservation_id", reservationId);
             immediateResults.push({ date, status: "failed", message });
           }
         }
@@ -221,6 +276,10 @@ export async function POST(request: NextRequest) {
               error_message: "도서관 로그인 실패",
             })
             .eq("id", reservationId);
+          await supabase
+            .from("reserved_slots")
+            .delete()
+            .eq("reservation_id", reservationId);
           immediateResults.push({
             date,
             status: "failed",
