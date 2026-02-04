@@ -23,7 +23,7 @@ import {
   type Companion,
 } from "@/components/reservation/CompanionInput";
 import { ReasonInput } from "@/components/reservation/ReasonInput";
-import { getNextWeekDate } from "@/lib/date";
+import { getNextWeekDate, formatDate } from "@/lib/date";
 
 const ReservationPage = () => {
   const router = useRouter();
@@ -38,6 +38,12 @@ const ReservationPage = () => {
   const [submitResult, setSubmitResult] = useState<{
     success: boolean;
     message: string;
+    immediateResults?: Array<{
+      date: string;
+      status: "success" | "failed";
+      message: string;
+    }>;
+    scheduledCount?: number;
   } | null>(null);
 
   const handleResetForm = () => {
@@ -128,7 +134,12 @@ const ReservationPage = () => {
       const data = await response.json();
 
       if (response.ok && data.success) {
-        setSubmitResult({ success: true, message: data.message });
+        setSubmitResult({
+          success: true,
+          message: data.message,
+          immediateResults: data.data?.immediateResults,
+          scheduledCount: data.data?.scheduledCount,
+        });
       } else {
         setSubmitResult({
           success: false,
@@ -217,7 +228,46 @@ const ReservationPage = () => {
               )}
               {submitResult?.success ? "예약 등록 완료" : "예약 등록 실패"}
             </DialogTitle>
-            <DialogDescription>{submitResult?.message}</DialogDescription>
+            <DialogDescription asChild>
+              <div className="space-y-3">
+                <p>{submitResult?.message}</p>
+
+                {submitResult?.immediateResults &&
+                  submitResult.immediateResults.length > 0 && (
+                    <div className="space-y-2">
+                      <p className="font-medium text-foreground">
+                        즉시 예약 결과
+                      </p>
+                      {submitResult.immediateResults.map((result) => (
+                        <div
+                          key={result.date}
+                          className="flex items-center gap-2 text-sm"
+                        >
+                          {result.status === "success" ? (
+                            <CircleCheck className="size-4 text-green-600 shrink-0" />
+                          ) : (
+                            <CircleX className="size-4 text-destructive shrink-0" />
+                          )}
+                          <span>
+                            {formatDate(result.date)} -{" "}
+                            {result.status === "success"
+                              ? "예약 완료"
+                              : result.message}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                {submitResult?.scheduledCount !== undefined &&
+                  submitResult.scheduledCount > 0 && (
+                    <p className="text-sm text-muted-foreground">
+                      나머지 {submitResult.scheduledCount}건은 자동 예약
+                      대기중입니다.
+                    </p>
+                  )}
+              </div>
+            </DialogDescription>
           </DialogHeader>
           <DialogFooter>
             <Button variant="outline" onClick={handleResetForm}>
