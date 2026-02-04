@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, CircleCheck, CircleX } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -16,14 +16,13 @@ import {
 } from "@/components/ui/dialog";
 import { StudyRoomSelect } from "@/components/reservation/StudyRoomSelect";
 import { ScheduleSelect } from "@/components/reservation/ScheduleSelect";
-import { TIME_SLOTS } from "@/constants/schedule";
 import { STUDY_ROOMS } from "@/constants/studyroom";
 import {
   CompanionInput,
   type Companion,
 } from "@/components/reservation/CompanionInput";
 import { ReasonInput } from "@/components/reservation/ReasonInput";
-import { getNextWeekDate, formatDate } from "@/lib/date";
+import { getNextWeekDate, generateRecurringDates, formatDate } from "@/lib/date";
 
 const ReservationPage = () => {
   const router = useRouter();
@@ -34,6 +33,7 @@ const ReservationPage = () => {
   const [endDate, setEndDate] = useState("");
   const [companions, setCompanions] = useState<Companion[]>([]);
   const [reason, setReason] = useState("");
+  const [occupiedSlots, setOccupiedSlots] = useState<string[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitResult, setSubmitResult] = useState<{
     success: boolean;
@@ -54,17 +54,49 @@ const ReservationPage = () => {
     setEndDate("");
     setCompanions([]);
     setReason("");
+    setOccupiedSlots([]);
     setSubmitResult(null);
   };
 
   const selectedRoom = STUDY_ROOMS.find((room) => room.id === studyRoomId);
 
-  // 시작 시간 변경 시 2시간 선택 불가하면 1시간으로 초기화
-  const lastSlot = TIME_SLOTS[TIME_SLOTS.length - 1];
-  const handleStartTimeChange = (time: string) => {
-    setStartTime(time);
-    if (time === lastSlot) setHours(1);
-  };
+  // 룸 + 요일 + 종료일이 모두 선택되면 점유 슬롯 조회
+  useEffect(() => {
+    if (!studyRoomId || !selectedDay || !endDate) {
+      setOccupiedSlots([]);
+      return;
+    }
+
+    const dates = generateRecurringDates(selectedDay, endDate);
+    if (dates.length === 0) {
+      setOccupiedSlots([]);
+      return;
+    }
+
+    const fetchSlots = async () => {
+      try {
+        const res = await fetch(
+          `/api/reservations/slots?roomId=${studyRoomId}&dates=${dates.join(",")}`,
+        );
+        const json = await res.json();
+        if (json.success) {
+          // 모든 날짜의 점유 슬롯을 합집합으로 계산
+          const allSlots = new Set<string>();
+          for (const slots of Object.values(json.data) as string[][]) {
+            for (const slot of slots) {
+              allSlots.add(slot);
+            }
+          }
+          setOccupiedSlots(Array.from(allSlots));
+        }
+      } catch {
+        // 조회 실패 시 비활성화 없이 진행
+        setOccupiedSlots([]);
+      }
+    };
+
+    fetchSlots();
+  }, [studyRoomId, selectedDay, endDate]);
 
   // 동반이용자 검증
   const handleVerifyCompanion = async (studentId: string, name: string) => {
@@ -180,11 +212,12 @@ const ReservationPage = () => {
             selectedDay={selectedDay}
             onDayChange={setSelectedDay}
             startTime={startTime}
-            onStartTimeChange={handleStartTimeChange}
+            onStartTimeChange={setStartTime}
             hours={hours}
             onHoursChange={setHours}
             endDate={endDate}
             onEndDateChange={setEndDate}
+            occupiedSlots={occupiedSlots}
           />
 
           <Separator />

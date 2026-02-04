@@ -1,15 +1,8 @@
 "use client";
 
-import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { getNextWeekDate } from "@/lib/date";
 import { DAYS, TIME_SLOTS } from "@/constants/schedule";
@@ -23,6 +16,7 @@ interface ScheduleSelectProps {
   onHoursChange: (hours: number) => void;
   endDate: string;
   onEndDateChange: (date: string) => void;
+  occupiedSlots: string[];
 }
 
 export const ScheduleSelect = ({
@@ -34,9 +28,31 @@ export const ScheduleSelect = ({
   onHoursChange,
   endDate,
   onEndDateChange,
+  occupiedSlots,
 }: ScheduleSelectProps) => {
   const lastSlot = TIME_SLOTS[TIME_SLOTS.length - 1];
-  const canSelectTwoHours = startTime !== lastSlot;
+
+  const isSlotDisabled = (time: string) => occupiedSlots.includes(time);
+
+  // 2시간 선택 가능 여부: 마지막 슬롯이 아니고, 다음 슬롯도 비어있어야 함
+  const canSelectTwoHours = (() => {
+    if (!startTime || startTime === lastSlot) return false;
+    const idx = TIME_SLOTS.indexOf(startTime);
+    if (idx === -1 || idx + 1 >= TIME_SLOTS.length) return false;
+    return !isSlotDisabled(TIME_SLOTS[idx + 1]);
+  })();
+
+  // 시간 버튼 클릭 시: 2시간 모드에서 다음 슬롯이 점유되어 있으면 1시간으로 전환
+  const handleTimeClick = (time: string) => {
+    onStartTimeChange(time);
+    if (hours === 2) {
+      const idx = TIME_SLOTS.indexOf(time);
+      const nextSlot = TIME_SLOTS[idx + 1];
+      if (!nextSlot || isSlotDisabled(nextSlot)) {
+        onHoursChange(1);
+      }
+    }
+  };
 
   // 종료일 최소값: 다음 주 해당 요일
   const minEndDate = selectedDay
@@ -66,44 +82,44 @@ export const ScheduleSelect = ({
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
-        <div className="space-y-2">
-          <Label>시작 시간</Label>
-          <Select value={startTime} onValueChange={onStartTimeChange}>
-            <SelectTrigger>
-              <SelectValue placeholder="시작 시간" />
-            </SelectTrigger>
-            <SelectContent>
-              {TIME_SLOTS.map((time) => (
-                <SelectItem key={time} value={time}>
-                  {time}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+      <div className="space-y-2">
+        <Label>이용시간</Label>
+        <p className="text-sm text-muted-foreground">
+          하루 최대 2시간까지 이용할 수 있어요
+        </p>
+        <div className="flex gap-2 flex-wrap">
+          {TIME_SLOTS.map((time) => {
+            const disabled = isSlotDisabled(time);
+            const selected = startTime === time;
+            return (
+              <Button
+                key={time}
+                type="button"
+                variant={selected ? "default" : "outline"}
+                disabled={disabled}
+                onClick={() => handleTimeClick(time)}
+              >
+                {parseInt(time)}시
+              </Button>
+            );
+          })}
         </div>
-
-        <div className="space-y-2">
-          <Label>이용 시간</Label>
-          <div className="flex gap-2">
-            <Button
-              type="button"
-              variant={hours === 1 ? "default" : "outline"}
-              className="flex-1"
-              onClick={() => onHoursChange(1)}
-            >
-              1시간
-            </Button>
-            <Button
-              type="button"
-              variant={hours === 2 ? "default" : "outline"}
-              className="flex-1"
-              disabled={!canSelectTwoHours}
-              onClick={() => onHoursChange(2)}
-            >
-              2시간
-            </Button>
-          </div>
+        <div className="flex gap-2">
+          <Button
+            type="button"
+            variant={hours === 1 ? "default" : "outline"}
+            onClick={() => onHoursChange(1)}
+          >
+            1시간
+          </Button>
+          <Button
+            type="button"
+            variant={hours === 2 ? "default" : "outline"}
+            disabled={!canSelectTwoHours}
+            onClick={() => onHoursChange(2)}
+          >
+            2시간
+          </Button>
         </div>
       </div>
 
@@ -120,10 +136,6 @@ export const ScheduleSelect = ({
           이 날짜까지 매주 반복 예약됩니다.
         </p>
       </div>
-
-      <p className="text-sm text-muted-foreground">
-        하루 최대 2시간까지 이용 가능합니다.
-      </p>
     </div>
   );
 };
