@@ -1,6 +1,5 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   ArrowLeft,
@@ -29,21 +28,7 @@ import {
 } from "@/components/ui/dialog";
 import { STUDY_ROOMS } from "@/constants/studyroom";
 import { formatDate, getEndTime, isFutureReservation } from "@/lib/date";
-
-interface Reservation {
-  id: number;
-  date: string;
-  status: "pending" | "success" | "failed" | "cancelled";
-  bookingId: string | null;
-}
-
-interface ReservationGroup {
-  groupId: string;
-  roomId: string;
-  startTime: string;
-  hours: number;
-  reservations: Reservation[];
-}
+import { useHistory } from "@/hooks/useHistory";
 
 const STATUS_CONFIG = {
   pending: { label: "대기", variant: "outline" as const },
@@ -55,75 +40,17 @@ const STATUS_CONFIG = {
 const getRoomName = (roomId: string) =>
   STUDY_ROOMS.find((r) => r.id === roomId)?.name ?? `룸 ${roomId}`;
 
-interface CancelTarget {
-  reservation: Reservation;
-  startTime: string;
-  type: "library" | "pending";
-}
-
 const HistoryPage = () => {
   const router = useRouter();
-  const [groups, setGroups] = useState<ReservationGroup[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [cancellingId, setCancellingId] = useState<number | null>(null);
-  const [cancelTarget, setCancelTarget] = useState<CancelTarget | null>(null);
-
-  const fetchHistory = async () => {
-    try {
-      const res = await fetch("/api/history");
-      const data = await res.json();
-      if (data.success) {
-        setGroups(data.data);
-      }
-    } catch {
-      // TODO: 에러 처리
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchHistory();
-  }, []);
-
-  const activeGroups = groups.filter(
-    (group) => !group.reservations.every((r) => r.status === "cancelled")
-  );
-
-  const openCancelModal = (reservation: Reservation, startTime: string) => {
-    const isFuture = isFutureReservation(reservation.date, startTime);
-    const type: CancelTarget["type"] =
-      reservation.status === "success" && isFuture ? "library" : "pending";
-
-    setCancelTarget({ reservation, startTime, type });
-  };
-
-  const confirmCancel = async () => {
-    if (!cancelTarget || cancellingId) return;
-
-    const reservationId = cancelTarget.reservation.id;
-    setCancellingId(reservationId);
-
-    try {
-      const res = await fetch("/api/reservations/cancel", {
-        method: "DELETE",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ reservationId }),
-      });
-
-      const data = await res.json();
-      if (data.success) {
-        await fetchHistory();
-        setCancelTarget(null);
-      } else {
-        alert(data.message);
-      }
-    } catch {
-      alert("예약 취소 중 오류가 발생했습니다.");
-    } finally {
-      setCancellingId(null);
-    }
-  };
+  const {
+    activeGroups,
+    isLoading,
+    cancellingId,
+    cancelTarget,
+    setCancelTarget,
+    openCancelModal,
+    confirmCancel,
+  } = useHistory();
 
   return (
     <div className="container max-w-2xl mx-auto py-8 px-4">
