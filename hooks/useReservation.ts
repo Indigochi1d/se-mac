@@ -22,6 +22,7 @@ export const useReservation = () => {
   const [endDate, setEndDate] = useState("");
   const [companions, setCompanions] = useState<Companion[]>([]);
   const [reason, setReason] = useState("");
+  const [notificationEmail, setNotificationEmail] = useState("");
   const [occupiedSlots, setOccupiedSlots] = useState<string[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitResult, setSubmitResult] = useState<SubmitResult | null>(null);
@@ -36,6 +37,7 @@ export const useReservation = () => {
     setEndDate("");
     setCompanions([]);
     setReason("");
+    setNotificationEmail("");
     setOccupiedSlots([]);
     setSubmitResult(null);
   };
@@ -137,6 +139,7 @@ export const useReservation = () => {
           companions,
           reason,
           endDate,
+          notificationEmail: notificationEmail.trim() || undefined,
         }),
       });
 
@@ -180,6 +183,8 @@ export const useReservation = () => {
     setCompanions,
     reason,
     setReason,
+    notificationEmail,
+    setNotificationEmail,
     selectedRoom,
     occupiedSlots,
     isSubmitting,

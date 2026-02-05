@@ -6,6 +6,7 @@ import { generateRecurringDates } from "@/lib/date";
 import { loginToLibrary } from "@/lib/sejong/auth";
 import { submitReservation } from "@/lib/sejong/reserve";
 import { generateSlotTimes } from "@/lib/slot";
+import { sendReservationEmail } from "@/lib/email";
 
 interface Companion {
   studentId: string;
@@ -21,6 +22,7 @@ interface ReservationRequest {
   companions: Companion[];
   reason: string;
   endDate: string;
+  notificationEmail?: string;
 }
 
 export async function POST(request: NextRequest) {
@@ -48,6 +50,7 @@ export async function POST(request: NextRequest) {
       companions,
       reason,
       endDate,
+      notificationEmail,
     } = body;
 
     if (
@@ -129,6 +132,7 @@ export async function POST(request: NextRequest) {
           hours,
           reason,
           status: "pending",
+          notification_email: notificationEmail || null,
         })
         .select("id")
         .single();
@@ -290,6 +294,18 @@ export async function POST(request: NextRequest) {
     }
 
     const scheduledCount = dates.length - immediateDates.size;
+
+    // 이메일 알림 발송
+    if (notificationEmail && immediateResults.length > 0) {
+      await sendReservationEmail({
+        to: notificationEmail,
+        roomId: studyRoomId,
+        startTime,
+        hours,
+        results: immediateResults,
+        scheduledCount,
+      });
+    }
 
     return NextResponse.json({
       success: true,

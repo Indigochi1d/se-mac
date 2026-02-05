@@ -3,6 +3,7 @@ import supabase from "@/lib/db";
 import { decrypt } from "@/lib/crypto";
 import { loginToPortal, loginToLibrary } from "@/lib/sejong/auth";
 import { submitReservation } from "@/lib/sejong/reserve";
+import { sendReservationEmail } from "@/lib/email";
 
 /** 예약은 7일 전에 수행 (KST 기준 오늘 + 7일) */
 const TARGET_DATE_OFFSET = 7;
@@ -38,6 +39,7 @@ export async function GET(request: NextRequest) {
       start_time,
       hours,
       reason,
+      notification_email,
       reservation_credentials ( password ),
       companions ( student_id, name, ipid )
     `,
@@ -196,6 +198,27 @@ export async function GET(request: NextRequest) {
         await markFailed(res.id, message);
         results.push({ reservationId: res.id, status: "failed", message });
       }
+    }
+
+    // 5e. 이메일 알림 발송
+    const email = studentReservations[0]?.notification_email;
+    if (email) {
+      const studentResults = results.filter((r) =>
+        studentReservations.some((sr) => sr.id === r.reservationId),
+      );
+
+      await sendReservationEmail({
+        to: email,
+        roomId: studentReservations[0].room_id,
+        startTime: studentReservations[0].start_time,
+        hours: studentReservations[0].hours,
+        results: studentResults.map((r) => ({
+          date: studentReservations.find((sr) => sr.id === r.reservationId)!
+            .reservation_date,
+          status: r.status,
+          message: r.message,
+        })),
+      });
     }
   }
 

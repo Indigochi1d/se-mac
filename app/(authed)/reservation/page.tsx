@@ -17,6 +17,7 @@ import { StudyRoomSelect } from "@/components/reservation/StudyRoomSelect";
 import { ScheduleSelect } from "@/components/reservation/ScheduleSelect";
 import { CompanionInput } from "@/components/reservation/CompanionInput";
 import { ReasonInput } from "@/components/reservation/ReasonInput";
+import { EmailInput } from "@/components/reservation/EmailInput";
 import { formatDate } from "@/lib/date";
 import { useReservation } from "@/hooks/useReservation";
 
@@ -37,6 +38,8 @@ const ReservationPage = () => {
     setCompanions,
     reason,
     setReason,
+    notificationEmail,
+    setNotificationEmail,
     selectedRoom,
     occupiedSlots,
     isSubmitting,
@@ -93,6 +96,11 @@ const ReservationPage = () => {
           <Separator />
 
           <ReasonInput value={reason} onChange={setReason} />
+
+          <EmailInput
+            value={notificationEmail}
+            onChange={setNotificationEmail}
+          />
 
           <Button
             className="w-full"
