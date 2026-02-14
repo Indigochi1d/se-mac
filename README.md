@@ -1,6 +1,6 @@
 ![alt text](.github/images/image.png)
 
-# SE-MAC: Sejong Univ Studyroom macro 
+# SE-MAC: Sejong Univ Studyroom Macro 
 
 SE-MAC은 세종대 학술정보원 스터디룸을 자동 예약할 수 있는 시스템입니다. 매주 같은 스터디룸을 수동 예약하는 번거로움을 해결하고자 만들어졌습니다. 세종대 학생들만 이용할 수 있는 서비스입니다.
 
