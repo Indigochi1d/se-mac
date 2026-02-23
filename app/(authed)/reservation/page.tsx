@@ -89,7 +89,7 @@ const ReservationPage = () => {
             companions={companions}
             onChange={setCompanions}
             onVerify={handleVerifyCompanion}
-            minPeople={selectedRoom?.minPeople ?? 2}
+            minPeople={selectedRoom?.minPeople ?? 3}
             maxPeople={selectedRoom?.maxPeople ?? 6}
           />
 
