@@ -32,7 +32,7 @@ interface ReservationResult {
  * 스터디룸 메인 페이지에서 예약 목록을 파싱하여 bookingId 조회
  * cheerio 대신 정규식 사용 (HTML 오류로 인한 파싱 문제 우회)
  */
-async function fetchBookingId(
+async function fetchBookingId( //TODO: bookingId가 response에 있는지 확인해야한다. 있겠지?
   ssotoken: string,
   roomId: string,
   year: string,
@@ -98,7 +98,7 @@ async function fetchFormFields(
   roomId: string,
 ): Promise<Record<string, string>> {
   const response = await fetch(
-    process.env.SEJONG_STUDYROOM_RESERVE_URL + roomId,
+    process.env.SEJONG_STUDYROOM_RESERVE_URL + roomId, // TODO: 예약 URL 수정해야함
     {
       method: "GET",
       headers: {
@@ -107,7 +107,7 @@ async function fetchFormFields(
     },
   );
 
-  const html = await response.text();
+  const html = await response.text(); //TODO: 바뀐 HTML 정보에 따라 여기도 다시 맵핑
   const $ = cheerio.load(html);
 
   const fields: Record<string, string> = {};
@@ -163,6 +163,7 @@ export async function submitReservation(
 
   // 4. 예약 제출
   const response = await fetch(process.env.SEJONG_LIBRARY_RESERVE_PROCESS_URL, {
+    // TODO: 예약 제출할때 URL 수정 필요
     method: "POST",
     headers: {
       "Content-Type": "application/x-www-form-urlencoded",
