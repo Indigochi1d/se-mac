@@ -11,7 +11,6 @@ import { sendReservationEmail } from "@/lib/email";
 interface Companion {
   studentId: string;
   name: string;
-  ipid: string;
 }
 
 interface ReservationRequest {
@@ -175,7 +174,6 @@ export async function POST(request: NextRequest) {
             reservation_id: reservation.id,
             student_id: c.studentId,
             name: c.name,
-            ipid: c.ipid,
           })),
         );
 
@@ -223,7 +221,6 @@ export async function POST(request: NextRequest) {
               companions: companions.map((c) => ({
                 student_id: c.studentId,
                 name: c.name,
-                ipid: c.ipid,
               })),
             });
 

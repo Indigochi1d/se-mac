@@ -47,7 +47,6 @@ const ReservationPage = () => {
     setSubmitResult,
     isValid,
     handleResetForm,
-    handleVerifyCompanion,
     handleSubmit,
   } = useReservation();
 
@@ -88,7 +87,6 @@ const ReservationPage = () => {
           <CompanionInput
             companions={companions}
             onChange={setCompanions}
-            onVerify={handleVerifyCompanion}
             minPeople={selectedRoom?.minPeople ?? 3}
             maxPeople={selectedRoom?.maxPeople ?? 6}
           />

@@ -78,32 +78,6 @@ export const useReservation = () => {
     fetchSlots();
   }, [studyRoomId, selectedDay, endDate]);
 
-  // 동반이용자 검증
-  const handleVerifyCompanion = async (studentId: string, name: string) => {
-    if (!selectedDay) {
-      return { success: false, error: "먼저 요일을 선택해주세요." };
-    }
-
-    const { year, month, day } = getNextWeekDate(selectedDay);
-
-    const response = await fetch("/api/students/verify", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ studentId, name, year, month, day }),
-    });
-
-    const data = await response.json();
-
-    if (response.ok && data.success) {
-      return { success: true, ipid: data.ipid };
-    }
-
-    return {
-      success: false,
-      error: data.error || "학생 정보를 확인할 수 없습니다.",
-    };
-  };
-
   // 유효성 검사
   const isValid = (() => {
     if (!studyRoomId) return false;
@@ -192,7 +166,6 @@ export const useReservation = () => {
     setSubmitResult,
     isValid,
     handleResetForm,
-    handleVerifyCompanion,
     handleSubmit,
   };
 };

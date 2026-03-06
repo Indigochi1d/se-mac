@@ -8,7 +8,6 @@ import { Label } from "@/components/ui/label";
 export interface Companion {
   studentId: string;
   name: string;
-  ipid: string;
 }
 
 interface VerifyResult {
@@ -20,7 +19,6 @@ interface VerifyResult {
 interface CompanionInputProps {
   companions: Companion[];
   onChange: (companions: Companion[]) => void;
-  onVerify: (studentId: string, name: string) => Promise<VerifyResult>;
   minPeople: number;
   maxPeople: number;
 }
@@ -28,16 +26,14 @@ interface CompanionInputProps {
 export const CompanionInput = ({
   companions,
   onChange,
-  onVerify,
   minPeople,
   maxPeople,
 }: CompanionInputProps) => {
   const [studentId, setStudentId] = useState("");
   const [name, setName] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
 
-  const handleAdd = async () => {
+  const handleAdd = () => {
     if (!studentId.trim() || !name.trim()) return;
 
     // 중복 체크
@@ -52,23 +48,10 @@ export const CompanionInput = ({
       return;
     }
 
-    setIsLoading(true);
     setError("");
-
-    const result = await onVerify(studentId.trim(), name.trim());
-
-    setIsLoading(false);
-
-    if (result.success && result.ipid) {
-      onChange([
-        ...companions,
-        { studentId: studentId.trim(), name: name.trim(), ipid: result.ipid },
-      ]);
-      setStudentId("");
-      setName("");
-    } else {
-      setError(result.error || "학생 정보를 확인할 수 없습니다.");
-    }
+    onChange([...companions, { studentId: studentId.trim(), name: name.trim() }]);
+    setStudentId("");
+    setName("");
   };
 
   const handleRemove = (studentIdToRemove: string) => {
@@ -94,22 +77,19 @@ export const CompanionInput = ({
           onChange={(e) => setStudentId(e.target.value.replace(/\D/g, ""))}
           inputMode="numeric"
           className="flex-1"
-          disabled={isLoading}
         />
         <Input
           placeholder="이름"
           value={name}
           onChange={(e) => setName(e.target.value)}
           className="flex-1"
-          disabled={isLoading}
         />
         <Button
           type="button"
           variant="outline"
           onClick={handleAdd}
-          disabled={isLoading}
         >
-          {isLoading ? "확인 중..." : "추가"}
+          추가
         </Button>
       </div>
 

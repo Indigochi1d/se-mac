@@ -6,7 +6,6 @@ import * as cheerio from "cheerio";
 interface Companion {
   student_id: string;
   name: string;
-  ipid: string;
 }
 
 interface ReservationParams {
@@ -148,7 +147,6 @@ export async function submitReservation(
     const i = index + 1;
     formFields[`altPid${i}`] = companion.student_id;
     formFields[`name${i}`] = companion.name;
-    formFields[`ipid${i}`] = companion.ipid;
   });
 
   // 3. 예약 정보 설정
