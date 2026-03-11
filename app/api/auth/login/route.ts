@@ -1,6 +1,5 @@
 import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
-import { encrypt } from "@/lib/crypto";
 
 interface LoginRequest {
   studentId: string;
@@ -61,8 +60,6 @@ export async function POST(
       };
 
       cookieStore.set("ssotoken", ssotoken, cookieOptions);
-      cookieStore.set("student_id", studentId, cookieOptions);
-      cookieStore.set("enc_password", encrypt(password), cookieOptions);
 
       return NextResponse.json({
         success: true,
