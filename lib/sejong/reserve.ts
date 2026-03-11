@@ -10,7 +10,7 @@ interface Companion {
 
 interface ReservationParams {
   ssotoken: string;
-  jsessionId: string;
+  phpSessId: string;
   roomId: string;
   year: string;
   month: string;
@@ -128,7 +128,7 @@ export async function submitReservation(
 ): Promise<ReservationResult> {
   const {
     ssotoken,
-    jsessionId,
+    phpSessId,
     roomId,
     year,
     month,
@@ -140,7 +140,7 @@ export async function submitReservation(
   } = params;
 
   // 1. 예약 폼 페이지에서 hidden 필드 가져오기
-  const formFields = await fetchFormFields(ssotoken, jsessionId, roomId);
+  const formFields = await fetchFormFields(ssotoken, phpSessId, roomId);
 
   // 2. 동반이용자 정보 추가
   companions.forEach((companion, index) => {
@@ -160,12 +160,11 @@ export async function submitReservation(
   formFields["mode"] = "INSERT";
 
   // 4. 예약 제출
-  const response = await fetch(process.env.SEJONG_LIBRARY_RESERVE_PROCESS_URL, {
-    // TODO: 예약 제출할때 URL 수정 필요
+  const response = await fetch(process.env.SEJONG_LIBSEAT_RESERVE_URL!, {
     method: "POST",
     headers: {
       "Content-Type": "application/x-www-form-urlencoded",
-      Cookie: `ssotoken=${ssotoken}; JSESSIONID=${jsessionId}`,
+      Cookie: `ssotoken=${ssotoken}; PHPSESSID=${phpSessId}`,
     },
     body: new URLSearchParams(formFields).toString(),
   });

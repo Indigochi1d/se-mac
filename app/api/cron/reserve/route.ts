@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import supabase from "@/lib/db";
 import { decrypt } from "@/lib/crypto";
-import { loginToPortal, loginToLibrary } from "@/lib/sejong/auth";
+import { loginToPortal, loginToLibseat } from "@/lib/sejong/auth";
 import { submitReservation } from "@/lib/sejong/reserve";
 import { sendReservationEmail } from "@/lib/email";
 
@@ -138,11 +138,15 @@ export async function GET(request: NextRequest) {
       continue;
     }
 
-    // 5c. 도서관 로그인
-    let jsessionId: string;
+    // 5c. libseat 로그인
+    let jsessionId: string | null;
     try {
-      jsessionId = await loginToLibrary(ssotoken);
+      jsessionId = await loginToLibseat(ssotoken);
     } catch {
+      jsessionId = null;
+    }
+
+    if (!jsessionId) {
       for (const res of studentReservations) {
         await markFailed(res.id, "도서관 로그인 실패");
         results.push({

@@ -1,6 +1,5 @@
 /**
  * 세종대 포탈 및 도서관 인증 함수
- * 기존 app/api/auth/login/route.ts, app/api/students/verify/route.ts 로직을 재사용 가능하게 추출
  */
 
 /**
@@ -34,17 +33,58 @@ export async function loginToPortal(
 }
 
 /**
- * 도서관 시스템에 SSO 로그인하여 JSESSIONID를 획득
+ * 포탈 SSO를 통해 library.sejong.ac.kr에 로그인하여 PO1_JSESSIONID를 획득
  */
-export async function loginToLibrary(ssotoken: string): Promise<string> {
-  const response = await fetch(process.env.SEJONG_LIBRARY_LOGIN_URL, {
+async function getPO1JSessionId(ssotoken: string): Promise<string | null> {
+  const response = await fetch(process.env.SEJONG_LIBRARY_SSO_URL, {
     method: "GET",
     headers: {
       Cookie: `ssotoken=${ssotoken}`,
     },
+    redirect: "manual",
   });
 
-  const setCookieHeader = response.headers.get("set-cookie");
-  const match = setCookieHeader?.match(/JSESSIONID=([^;]+)/);
-  return match ? match[1] : "";
+  const cookies = response.headers.getSetCookie();
+  for (const cookie of cookies) {
+    const match = cookie.match(/PO1_JSESSIONID=([^;]+)/);
+    if (match) return match[1];
+  }
+  return null;
+}
+
+/**
+ * ssotoken으로 libseat에 로그인하여 PHPSESSID를 획득
+ * 내부적으로 library SSO → studyroom 페이지 파싱 → libseat 접근 순서로 진행
+ */
+export async function loginToLibseat(ssotoken: string): Promise<string | null> {
+  // 1. PO1_JSESSIONID 획득
+  const po1JsessionId = await getPO1JSessionId(ssotoken);
+  if (!po1JsessionId) return null;
+
+  // 2. library studyroom 페이지에서 libseat URL + token 파싱
+  const libraryRes = await fetch(process.env.SEJONG_LIBRARY_STUDYROOM_URL, {
+    method: "GET",
+    headers: {
+      Cookie: `ssotoken=${ssotoken}; PO1_JSESSIONID=${po1JsessionId}`,
+    },
+  });
+
+  const html = await libraryRes.text();
+  const match = html.match(/libseat\.sejong\.ac\.kr[^\s"'<>]*/);
+  if (!match) return null;
+
+  const libseatUrl = `https://${match[0]}`;
+
+  // 3. libseat URL 접근하여 PHPSESSID 획득
+  const libseatRes = await fetch(libseatUrl, {
+    method: "GET",
+    redirect: "manual",
+  });
+
+  const setCookies = libseatRes.headers.getSetCookie();
+  for (const cookie of setCookies) {
+    const m = cookie.match(/PHPSESSID=([^;]+)/);
+    if (m) return m[1];
+  }
+  return null;
 }

@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { randomUUID } from "crypto";
 import supabase from "@/lib/db";
 import { generateRecurringDates } from "@/lib/date";
-import { loginToLibrary } from "@/lib/sejong/auth";
+import { loginToLibseat } from "@/lib/sejong/auth";
 import { submitReservation } from "@/lib/sejong/reserve";
 import { generateSlotTimes } from "@/lib/slot";
 import { sendReservationEmail } from "@/lib/email";
@@ -201,7 +201,8 @@ export async function POST(request: NextRequest) {
 
     if (immediateDates.size > 0) {
       try {
-        const jsessionId = await loginToLibrary(ssotoken);
+        const phpSessId = await loginToLibseat(ssotoken);
+        if (!phpSessId) throw new Error("도서관 로그인 실패");
 
         for (const date of immediateDates) {
           const reservationId = reservationMap.get(date)!;
@@ -210,7 +211,7 @@ export async function POST(request: NextRequest) {
           try {
             const result = await submitReservation({
               ssotoken,
-              jsessionId,
+              phpSessId,
               roomId: studyRoomId,
               year,
               month,

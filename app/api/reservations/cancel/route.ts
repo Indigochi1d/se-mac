@@ -2,7 +2,7 @@ import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
 import supabase from "@/lib/db";
 import { decrypt } from "@/lib/crypto";
-import { loginToPortal, loginToLibrary } from "@/lib/sejong/auth";
+import { loginToPortal, loginToLibseat } from "@/lib/sejong/auth";
 
 interface CancelRequest {
   reservationId: number;
@@ -106,8 +106,15 @@ export async function DELETE(request: NextRequest) {
         );
       }
 
-      // 도서관 로그인으로 JSESSIONID 획득
-      const jsessionId = await loginToLibrary(newSsotoken);
+      // libseat 로그인으로 PHPSESSID 획득
+      const phpSessId = await loginToLibseat(newSsotoken);
+      if (!phpSessId) {
+        return NextResponse.json(
+          { success: false, message: "도서관 인증에 실패했습니다." },
+          { status: 500 },
+        );
+      }
+
       // 도서관 취소 요청
       const cancelFormData = new URLSearchParams({
         cancelMsg: cancelMsg,
@@ -119,12 +126,12 @@ export async function DELETE(request: NextRequest) {
       });
 
       const cancelResponse = await fetch(
-        process.env.SEJONG_LIBRARY_RESERVE_PROCESS_URL!,
+        process.env.SEJONG_LIBSEAT_RESERVE_URL!,
         {
           method: "POST",
           headers: {
             "Content-Type": "application/x-www-form-urlencoded",
-            Cookie: `ssotoken=${newSsotoken}; JSESSIONID=${jsessionId}`,
+            Cookie: `ssotoken=${newSsotoken}; PHPSESSID=${phpSessId}`,
           },
           body: cancelFormData.toString(),
         },
