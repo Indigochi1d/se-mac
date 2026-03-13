@@ -30,14 +30,29 @@ export async function POST(request: NextRequest) {
     const cookieStore = await cookies();
     const ssotoken = cookieStore.get("ssotoken")?.value;
     const studentId = cookieStore.get("student_id")?.value;
-    const encPassword = cookieStore.get("enc_password")?.value;
 
-    if (!ssotoken || !studentId || !encPassword) {
+    if (!ssotoken || !studentId) {
       return NextResponse.json(
         { success: false, message: "인증이 필요합니다. 다시 로그인해주세요." },
         { status: 401 },
       );
     }
+
+    // DB에서 암호화된 비밀번호 조회
+    const { data: userCred, error: credFetchError } = await supabase
+      .from("user_credentials")
+      .select("password")
+      .eq("student_id", studentId)
+      .single();
+
+    if (credFetchError || !userCred) {
+      return NextResponse.json(
+        { success: false, message: "인증이 필요합니다. 다시 로그인해주세요." },
+        { status: 401 },
+      );
+    }
+
+    const encPassword = userCred.password;
 
     // 2. 요청 바디 파싱 및 검증
     const body: ReservationRequest = await request.json();

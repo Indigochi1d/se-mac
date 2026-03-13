@@ -2,6 +2,7 @@ import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
 import { loginToPortal, loginToLibseat } from "@/lib/sejong/auth";
 import { encrypt } from "@/lib/crypto";
+import supabase from "@/lib/db";
 
 interface LoginRequest {
   studentId: string;
@@ -47,7 +48,14 @@ export async function POST(
       );
     }
 
-    // 3. 쿠키 저장
+    // 3. 암호화된 비밀번호를 DB에 저장 (쿠키에 두지 않음)
+    const { error: credError } = await supabase
+      .from("user_credentials")
+      .upsert({ student_id: studentId, password: encrypt(password) });
+
+    if (credError) throw credError;
+
+    // 4. 쿠키 저장
     const cookieStore = await cookies();
     const cookieOptions = {
       httpOnly: true,
@@ -61,7 +69,6 @@ export async function POST(
     cookieStore.set("PHPSESSID", session.phpSessId, cookieOptions);
     cookieStore.set("student_id", studentId, cookieOptions);
     cookieStore.set("student_name", session.studentName, cookieOptions);
-    cookieStore.set("enc_password", encrypt(password), cookieOptions);
 
     return NextResponse.json({ success: true, message: "로그인 성공" });
   } catch (error) {
