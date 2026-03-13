@@ -41,7 +41,7 @@ export async function GET(request: NextRequest) {
       reason,
       notification_email,
       reservation_credentials ( password ),
-      companions ( student_id, name, ipid )
+      companions ( student_id, name )
     `,
     )
     .eq("reservation_date", targetDate)
@@ -139,14 +139,14 @@ export async function GET(request: NextRequest) {
     }
 
     // 5c. libseat 로그인
-    let jsessionId: string | null;
+    let libseatSession: Awaited<ReturnType<typeof loginToLibseat>>;
     try {
-      jsessionId = await loginToLibseat(ssotoken);
+      libseatSession = await loginToLibseat(ssotoken);
     } catch {
-      jsessionId = null;
+      libseatSession = null;
     }
 
-    if (!jsessionId) {
+    if (!libseatSession) {
       for (const res of studentReservations) {
         await markFailed(res.id, "도서관 로그인 실패");
         results.push({
@@ -160,7 +160,8 @@ export async function GET(request: NextRequest) {
 
     // 5d. 각 예약 제출
     for (const res of studentReservations) {
-      const [year, month, day] = res.reservation_date.split("-");
+      const reserveDate = res.reservation_date.replace(/-/g, ""); // YYYY-MM-DD → YYYYMMDD
+      const reserveStartTime = res.start_time.replace(":", ""); // HH:MM → HHMM
       const companions = Array.isArray(res.companions)
         ? res.companions
         : res.companions
@@ -170,19 +171,19 @@ export async function GET(request: NextRequest) {
       try {
         const result = await submitReservation({
           ssotoken,
-          jsessionId,
+          phpSessId: libseatSession.phpSessId,
+          token: libseatSession.token,
           roomId: res.room_id,
-          year,
-          month,
-          day,
-          startHour: res.start_time.split(":")[0], // "13:00" → "13"
+          reserveDate,
+          startTime: reserveStartTime,
           hours: res.hours,
-          purpose: res.reason,
+          studentId,
+          studentName: libseatSession.studentName,
           companions,
         });
 
         if (result.success) {
-          await updateStatus(res.id, "success", undefined, result.bookingId);
+          await updateStatus(res.id, "success");
           results.push({
             reservationId: res.id,
             status: "success",

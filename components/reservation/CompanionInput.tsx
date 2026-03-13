@@ -10,11 +10,6 @@ export interface Companion {
   name: string;
 }
 
-interface VerifyResult {
-  success: boolean;
-  ipid?: string;
-  error?: string;
-}
 
 interface CompanionInputProps {
   companions: Companion[];

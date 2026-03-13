@@ -1,7 +1,7 @@
 /**
  * 세종대 도서관 스터디룸 예약 제출 로직
  */
-import * as cheerio from "cheerio";
+import { STUDY_ROOMS } from "@/constants/studyroom";
 
 interface Companion {
   student_id: string;
@@ -11,113 +11,19 @@ interface Companion {
 interface ReservationParams {
   ssotoken: string;
   phpSessId: string;
+  token: string;
   roomId: string;
-  year: string;
-  month: string;
-  day: string;
-  startHour: string;
+  reserveDate: string; // YYYYMMDD
+  startTime: string; // HHMM
   hours: number;
-  purpose: string;
+  studentId: string;
+  studentName: string;
   companions: Companion[];
 }
 
 interface ReservationResult {
   success: boolean;
   message: string;
-  bookingId?: string;
-}
-
-/**
- * 스터디룸 메인 페이지에서 예약 목록을 파싱하여 bookingId 조회
- * cheerio 대신 정규식 사용 (HTML 오류로 인한 파싱 문제 우회)
- */
-async function fetchBookingId( //TODO: bookingId가 response에 있는지 확인해야한다. 있겠지?
-  ssotoken: string,
-  roomId: string,
-  year: string,
-  month: string,
-  day: string,
-  startHour: string,
-): Promise<string | undefined> {
-  // 도서관 로그인하여 세션 쿠키 획득
-  const loginResponse = await fetch(process.env.SEJONG_LIBRARY_LOGIN_URL!, {
-    headers: {
-      Cookie: `ssotoken=${ssotoken}`,
-    },
-    redirect: "manual",
-  });
-
-  const libraryCookies = loginResponse.headers.getSetCookie();
-  const cookieHeader = libraryCookies.map((c) => c.split(";")[0]).join("; ");
-
-  // 메인 페이지 조회 (ssotoken도 함께 전달)
-  const response = await fetch(process.env.SEJONG_LIBRARY_STUDYROOM_URL!, {
-    headers: {
-      Cookie: `ssotoken=${ssotoken}; ${cookieHeader}`,
-    },
-  });
-
-  const html = await response.text();
-
-  // HTML 날짜 형식: 2026/02/10 (슬래시)
-  const targetDate = `${year}/${month.padStart(2, "0")}/${day.padStart(2, "0")}`;
-  const targetTime = `${startHour.padStart(2, "0")}:00`;
-
-  // 정규식으로 각 <tr> 블록 추출
-  const trPattern = /<tr[^>]*>[\s\S]*?<\/tr>/gi;
-  const trMatches = html.match(trPattern) || [];
-
-  for (const trContent of trMatches) {
-    // goStudyRoomBookingDetail('bookingId','ipid','roomId') 패턴 추출
-    const detailMatch = trContent.match(
-      /goStudyRoomBookingDetail\('(\d+)','(\d+)','(\d+)'\)/,
-    );
-    if (!detailMatch) continue;
-
-    const [, rowBookingId, , rowRoomId] = detailMatch;
-
-    // roomId 확인
-    if (rowRoomId !== roomId) continue;
-
-    // 날짜/시간 확인 (2026/02/10 14:00 형식)
-    if (trContent.includes(targetDate) && trContent.includes(targetTime)) {
-      return rowBookingId;
-    }
-  }
-
-  return undefined;
-}
-
-/**
- * 예약 폼 페이지에서 hidden 필드를 파싱
- */
-async function fetchFormFields(
-  ssotoken: string,
-  jsessionId: string,
-  roomId: string,
-): Promise<Record<string, string>> {
-  const response = await fetch(
-    process.env.SEJONG_STUDYROOM_RESERVE_URL + roomId, // TODO: 예약 URL 수정해야함
-    {
-      method: "GET",
-      headers: {
-        Cookie: `ssotoken=${ssotoken}; JSESSIONID=${jsessionId}`,
-      },
-    },
-  );
-
-  const html = await response.text(); //TODO: 바뀐 HTML 정보에 따라 여기도 다시 맵핑
-  const $ = cheerio.load(html);
-
-  const fields: Record<string, string> = {};
-  $("#frmMain input").each((_, el) => {
-    const name = $(el).attr("name");
-    if (name) {
-      fields[name] = $(el).attr("value") ?? "";
-    }
-  });
-
-  return fields;
 }
 
 /**
@@ -129,68 +35,90 @@ export async function submitReservation(
   const {
     ssotoken,
     phpSessId,
+    token,
     roomId,
-    year,
-    month,
-    day,
-    startHour,
+    reserveDate,
+    startTime,
     hours,
-    purpose,
+    studentId,
+    studentName,
     companions,
   } = params;
 
-  // 1. 예약 폼 페이지에서 hidden 필드 가져오기
-  const formFields = await fetchFormFields(ssotoken, phpSessId, roomId);
+  const room = STUDY_ROOMS.find((r) => r.id === roomId);
+  if (!room) {
+    return { success: false, message: "알 수 없는 룸 ID입니다." };
+  }
 
-  // 2. 동반이용자 정보 추가
-  companions.forEach((companion, index) => {
-    const i = index + 1;
-    formFields[`altPid${i}`] = companion.student_id;
-    formFields[`name${i}`] = companion.name;
+  const seatCnt = room.maxPeople;
+  const sroomTitle = `그룹스터디룸${seatCnt}인실`;
+  const sroomName = `${roomId.padStart(2, "0")}스터디룸`;
+  const roomGB = "S1";
+
+  // 1. 예약 폼 페이지 GET (세션 컨텍스트 설정)
+  const formUrl = new URL(process.env.SEJONG_LIBSEAT_RESERVE_FORM_URL!);
+  formUrl.searchParams.set("token", token);
+  formUrl.searchParams.set("roomGB", roomGB);
+  formUrl.searchParams.set("seatCnt", String(seatCnt));
+  formUrl.searchParams.set("sroomTitle", sroomTitle);
+  formUrl.searchParams.set("reserveDate", reserveDate);
+  formUrl.searchParams.set("sroomNo", roomId);
+  formUrl.searchParams.set("sroomName", sroomName);
+  formUrl.searchParams.set("startTime", startTime);
+
+  await fetch(formUrl.toString(), {
+    method: "GET",
+    headers: {
+      Cookie: `PHPSESSID=${phpSessId}; ssotoken=${ssotoken}`,
+    },
   });
 
-  // 3. 예약 정보 설정
-  formFields["year"] = year;
-  formFields["month"] = month;
-  formFields["day"] = day;
-  formFields["startHour"] = startHour;
-  formFields["closeTime"] = "22";
-  formFields["hours"] = String(hours);
-  formFields["purpose"] = purpose;
-  formFields["mode"] = "INSERT";
+  // 2. 예약 제출 POST
+  const userIDs = [studentId, ...companions.map((c) => c.student_id)].join("|");
+  const userNames = [studentName, ...companions.map((c) => c.name)].join("|");
 
-  // 4. 예약 제출
+  const formData = new URLSearchParams({
+    userID: userIDs,
+    userName: userNames,
+    roomNo: roomId,
+    reserveDate,
+    startTime,
+    useTime: String(hours * 60),
+  });
+
   const response = await fetch(process.env.SEJONG_LIBSEAT_RESERVE_URL!, {
     method: "POST",
     headers: {
-      "Content-Type": "application/x-www-form-urlencoded",
-      Cookie: `ssotoken=${ssotoken}; PHPSESSID=${phpSessId}`,
+      "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+      Cookie: `PHPSESSID=${phpSessId}; ssotoken=${ssotoken}`,
+      Referer: formUrl.toString(),
+      "X-Requested-With": "XMLHttpRequest",
     },
-    body: new URLSearchParams(formFields).toString(),
+    body: formData.toString(),
   });
 
-  // 5. 결과 확인
-  const xJson = response.headers.get("X-JSON");
+  const body = (await response.text()).trim();
 
-  if (xJson && xJson.includes("true")) {
-    // 6. 예약 성공 시 메인 페이지에서 bookingId 조회
-
-    const bookingId = await fetchBookingId(
-      ssotoken,
-      roomId,
-      year,
-      month,
-      day,
-      startHour,
-    );
-
-    return {
-      success: true,
-      message: "예약이 완료되었습니다.",
-      bookingId,
-    };
+  if (!response.ok) {
+    return { success: false, message: body || "예약에 실패했습니다." };
   }
 
-  const body = await response.text();
-  return { success: false, message: body.trim() || "예약에 실패했습니다." };
+  // XML 응답 파싱: resultCode=0 → 성공
+  if (body.length > 0) {
+    const codeMatch = body.match(
+      /<resultCode><!\[CDATA\[(\d+)\]\]><\/resultCode>/,
+    );
+    const msgMatch = body.match(
+      /<resultMsg><!\[CDATA\[([\s\S]*?)\]\]><\/resultMsg>/,
+    );
+    const resultCode = codeMatch ? parseInt(codeMatch[1], 10) : -1;
+    const resultMsg = msgMatch ? msgMatch[1].trim() : body;
+
+    if (resultCode === 0) {
+      return { success: true, message: resultMsg };
+    }
+    return { success: false, message: resultMsg };
+  }
+
+  return { success: true, message: "예약이 완료되었습니다." };
 }

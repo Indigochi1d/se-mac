@@ -1,6 +1,7 @@
 import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
 import { loginToPortal, loginToLibseat } from "@/lib/sejong/auth";
+import { encrypt } from "@/lib/crypto";
 
 interface LoginRequest {
   studentId: string;
@@ -36,10 +37,10 @@ export async function POST(
       );
     }
 
-    // 2. libseat 로그인 → PHPSESSID
-    const phpSessId = await loginToLibseat(ssotoken);
+    // 2. libseat 로그인 → PHPSESSID, token, studentName
+    const session = await loginToLibseat(ssotoken);
 
-    if (!phpSessId) {
+    if (!session) {
       return NextResponse.json(
         { success: false, message: "도서관 인증에 실패했습니다." },
         { status: 500 },
@@ -57,7 +58,10 @@ export async function POST(
     };
 
     cookieStore.set("ssotoken", ssotoken, cookieOptions);
-    cookieStore.set("PHPSESSID", phpSessId, cookieOptions);
+    cookieStore.set("PHPSESSID", session.phpSessId, cookieOptions);
+    cookieStore.set("student_id", studentId, cookieOptions);
+    cookieStore.set("student_name", session.studentName, cookieOptions);
+    cookieStore.set("enc_password", encrypt(password), cookieOptions);
 
     return NextResponse.json({ success: true, message: "로그인 성공" });
   } catch (error) {

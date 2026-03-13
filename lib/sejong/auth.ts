@@ -52,16 +52,24 @@ async function getPO1JSessionId(ssotoken: string): Promise<string | null> {
   return null;
 }
 
+export interface LibseatSession {
+  phpSessId: string;
+  token: string;
+  studentName: string;
+}
+
 /**
- * ssotoken으로 libseat에 로그인하여 PHPSESSID를 획득
+ * ssotoken으로 libseat에 로그인하여 PHPSESSID, token, 학생 이름을 획득
  * 내부적으로 library SSO → studyroom 페이지 파싱 → libseat 접근 순서로 진행
  */
-export async function loginToLibseat(ssotoken: string): Promise<string | null> {
+export async function loginToLibseat(
+  ssotoken: string,
+): Promise<LibseatSession | null> {
   // 1. PO1_JSESSIONID 획득
   const po1JsessionId = await getPO1JSessionId(ssotoken);
   if (!po1JsessionId) return null;
 
-  // 2. library studyroom 페이지에서 libseat URL + token 파싱
+  // 2. library studyroom 페이지에서 libseat URL + 학생 이름 파싱
   const libraryRes = await fetch(process.env.SEJONG_LIBRARY_STUDYROOM_URL, {
     method: "GET",
     headers: {
@@ -70,10 +78,15 @@ export async function loginToLibseat(ssotoken: string): Promise<string | null> {
   });
 
   const html = await libraryRes.text();
-  const match = html.match(/libseat\.sejong\.ac\.kr[^\s"'<>]*/);
-  if (!match) return null;
 
-  const libseatUrl = `https://${match[0]}`;
+  const nameMatch = html.match(/<span class="userId">([^<]+)<\/span>/);
+  const studentName = nameMatch ? nameMatch[1].trim() : "";
+
+  const urlMatch = html.match(/libseat\.sejong\.ac\.kr[^\s"'<>]*/);
+  if (!urlMatch) return null;
+
+  const libseatUrl = `https://${urlMatch[0]}`;
+  const token = new URL(libseatUrl).searchParams.get("token") ?? "";
 
   // 3. libseat URL 접근하여 PHPSESSID 획득
   const libseatRes = await fetch(libseatUrl, {
@@ -84,7 +97,7 @@ export async function loginToLibseat(ssotoken: string): Promise<string | null> {
   const setCookies = libseatRes.headers.getSetCookie();
   for (const cookie of setCookies) {
     const m = cookie.match(/PHPSESSID=([^;]+)/);
-    if (m) return m[1];
+    if (m) return { phpSessId: m[1], token, studentName };
   }
   return null;
 }

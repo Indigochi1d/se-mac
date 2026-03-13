@@ -201,24 +201,25 @@ export async function POST(request: NextRequest) {
 
     if (immediateDates.size > 0) {
       try {
-        const phpSessId = await loginToLibseat(ssotoken);
-        if (!phpSessId) throw new Error("도서관 로그인 실패");
+        const session = await loginToLibseat(ssotoken);
+        if (!session) throw new Error("도서관 로그인 실패");
 
         for (const date of immediateDates) {
           const reservationId = reservationMap.get(date)!;
-          const [year, month, day] = date.split("-");
+          const reserveDate = date.replace(/-/g, ""); // YYYY-MM-DD → YYYYMMDD
+          const reserveStartTime = startTime.replace(":", ""); // HH:MM → HHMM
 
           try {
             const result = await submitReservation({
               ssotoken,
-              phpSessId,
+              phpSessId: session.phpSessId,
+              token: session.token,
               roomId: studyRoomId,
-              year,
-              month,
-              day,
-              startHour: startTime.split(":")[0],
+              reserveDate,
+              startTime: reserveStartTime,
               hours,
-              purpose: reason,
+              studentId,
+              studentName: session.studentName,
               companions: companions.map((c) => ({
                 student_id: c.studentId,
                 name: c.name,
@@ -228,10 +229,7 @@ export async function POST(request: NextRequest) {
             if (result.success) {
               await supabase
                 .from("reservations")
-                .update({
-                  status: "success",
-                  ...(result.bookingId && { booking_id: result.bookingId }),
-                })
+                .update({ status: "success" })
                 .eq("id", reservationId);
               immediateResults.push({
                 date,
