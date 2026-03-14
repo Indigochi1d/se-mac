@@ -120,11 +120,21 @@ export const useReservation = () => {
       const data = await response.json();
 
       if (response.ok && data.success) {
+        const immediateResults = data.data?.immediateResults ?? [];
+        const scheduledCount = data.data?.scheduledCount ?? 0;
+
+        // 즉시 예약이 전부 실패했고 예정 예약도 없으면 실패로 표시
+        const allImmediateFailed =
+          immediateResults.length > 0 &&
+          immediateResults.every(
+            (r: { status: string }) => r.status === "failed",
+          );
+
         setSubmitResult({
-          success: true,
+          success: !(allImmediateFailed && scheduledCount === 0),
           message: data.message,
-          immediateResults: data.data?.immediateResults,
-          scheduledCount: data.data?.scheduledCount,
+          immediateResults,
+          scheduledCount,
         });
       } else {
         setSubmitResult({

@@ -6,6 +6,7 @@ import { generateRecurringDates } from "@/lib/date";
 import { loginToLibseat } from "@/lib/sejong/auth";
 import { submitReservation } from "@/lib/sejong/reserve";
 import { generateSlotTimes } from "@/lib/slot";
+import { getLibseatUnavailableTimes } from "@/lib/sejong/availability";
 import { sendReservationEmail } from "@/lib/email";
 
 interface Companion {
@@ -223,6 +224,25 @@ export async function POST(request: NextRequest) {
           const reservationId = reservationMap.get(date)!;
           const reserveDate = date.replace(/-/g, ""); // YYYY-MM-DD → YYYYMMDD
           const reserveStartTime = startTime.replace(":", ""); // HH:MM → HHMM
+
+          // libseat 실제 가용성 확인 (학교 시스템에서 직접 예약된 경우 차단)
+          const unavailableTimes = await getLibseatUnavailableTimes(
+            studyRoomId,
+            reserveDate,
+          );
+          const conflictTime = generateSlotTimes(startTime, hours).find((t) =>
+            unavailableTimes.has(t),
+          );
+
+          if (conflictTime) {
+            const message = `${date} ${conflictTime} 시간대는 이미 예약되어 있습니다.`;
+            await supabase
+              .from("reservations")
+              .delete()
+              .eq("id", reservationId);
+            immediateResults.push({ date, status: "failed", message });
+            continue;
+          }
 
           try {
             const result = await submitReservation({
