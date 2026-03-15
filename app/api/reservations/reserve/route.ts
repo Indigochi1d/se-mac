@@ -132,10 +132,41 @@ export async function POST(request: NextRequest) {
     // 5. group_id 생성
     const groupId = randomUUID();
 
-    // 6. 날짜별 INSERT (모든 날짜를 우선 DB에 저장)
+    // 6. 즉시 예약 대상 libseat 가용성 사전 확인 (INSERT 전에 체크하여 DB 오염 방지)
+    const immediateResults: Array<{
+      date: string;
+      status: "success" | "failed";
+      message: string;
+    }> = [];
+    const conflictDates = new Set<string>();
+
+    for (const date of immediateDates) {
+      const reserveDate = date.replace(/-/g, "");
+      const unavailableTimes = await getLibseatUnavailableTimes(
+        studyRoomId,
+        reserveDate,
+      );
+
+      const conflictTime = generateSlotTimes(startTime, hours).find((t) =>
+        unavailableTimes.has(t),
+      );
+      if (conflictTime) {
+        conflictDates.add(date);
+        immediateResults.push({
+          date,
+          status: "failed",
+          message: `${date} ${conflictTime} 시간대는 이미 예약되어 있습니다.`,
+        });
+      }
+    }
+
+    // 7. 날짜별 INSERT (충돌 날짜 제외)
     const reservationMap = new Map<string, number>();
 
     for (const date of dates) {
+      if (conflictDates.has(date)) {
+        continue;
+      }
       const { data: reservation, error: resError } = await supabase
         .from("reservations")
         .insert({
@@ -208,41 +239,20 @@ export async function POST(request: NextRequest) {
       if (credError) throw credError;
     }
 
-    // 7. 즉시 예약 대상이 있으면 바로 예약 시도
-    const immediateResults: Array<{
-      date: string;
-      status: "success" | "failed";
-      message: string;
-    }> = [];
+    // 8. 충돌 없는 즉시 예약 대상만 실제 예약 시도
+    const submittableDates = [...immediateDates].filter(
+      (d) => !conflictDates.has(d),
+    );
 
-    if (immediateDates.size > 0) {
+    if (submittableDates.length > 0) {
       try {
         const session = await loginToLibseat(ssotoken);
         if (!session) throw new Error("도서관 로그인 실패");
 
-        for (const date of immediateDates) {
+        for (const date of submittableDates) {
           const reservationId = reservationMap.get(date)!;
           const reserveDate = date.replace(/-/g, ""); // YYYY-MM-DD → YYYYMMDD
           const reserveStartTime = startTime.replace(":", ""); // HH:MM → HHMM
-
-          // libseat 실제 가용성 확인 (학교 시스템에서 직접 예약된 경우 차단)
-          const unavailableTimes = await getLibseatUnavailableTimes(
-            studyRoomId,
-            reserveDate,
-          );
-          const conflictTime = generateSlotTimes(startTime, hours).find((t) =>
-            unavailableTimes.has(t),
-          );
-
-          if (conflictTime) {
-            const message = `${date} ${conflictTime} 시간대는 이미 예약되어 있습니다.`;
-            await supabase
-              .from("reservations")
-              .delete()
-              .eq("id", reservationId);
-            immediateResults.push({ date, status: "failed", message });
-            continue;
-          }
 
           try {
             const result = await submitReservation({
@@ -301,8 +311,8 @@ export async function POST(request: NextRequest) {
           }
         }
       } catch {
-        // 도서관 로그인 실패 → 모든 즉시 예약 대상을 failed 처리
-        for (const date of immediateDates) {
+        // 도서관 로그인 실패 → 충돌 없는 즉시 예약 대상을 failed 처리
+        for (const date of submittableDates) {
           const reservationId = reservationMap.get(date)!;
           await supabase
             .from("reservations")
@@ -324,7 +334,8 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const scheduledCount = dates.length - immediateDates.size;
+    const insertedDates = dates.filter((d) => !conflictDates.has(d));
+    const scheduledCount = insertedDates.length - submittableDates.length;
 
     // 이메일 알림 발송
     if (notificationEmail && immediateResults.length > 0) {
@@ -340,11 +351,11 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      message: `${dates.length}건의 예약이 등록되었습니다.`,
+      message: `${insertedDates.length}건의 예약이 등록되었습니다.`,
       data: {
         groupId,
-        count: dates.length,
-        dates,
+        count: insertedDates.length,
+        dates: insertedDates,
         immediateResults,
         scheduledCount,
       },

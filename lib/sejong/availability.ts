@@ -60,6 +60,7 @@ export async function getLibseatUnavailableTimes(
     const response = await fetch(url.toString());
     if (!response.ok) return new Set();
     const html = await response.text();
+
     return parseUnavailableTimesForRoom(html, room.name);
   } catch {
     return new Set();
@@ -80,14 +81,14 @@ function parseUnavailableTimesForRoom(
   html: string,
   roomName: string,
 ): Set<string> {
-  // "스터디룸 07" → "07스터디룸"
+  // "스터디룸 07" → "07스터디룸" 학술정보원 div에 따름
   const number = roomName.replace("스터디룸 ", "");
   const htmlRoomName = `${number}스터디룸`;
 
   // at-title 헤더에서 컬럼 인덱스 파싱
   const atTitleMatches = [
     ...html.matchAll(
-      /<div class="at-title"[^>]*>[\s\S]*?<span>([^<]+)<\/span>/g,
+      /<div class=['"]at-title['"][^>]*>[\s\S]*?<span>([^<]+)<\/span>/g,
     ),
   ];
 
@@ -96,24 +97,22 @@ function parseUnavailableTimesForRoom(
     // 단독 룸 (12인실): 컬럼 인덱스 0
     columnIndex = 0;
   } else {
-    columnIndex = atTitleMatches.findIndex(
-      (m) => m[1].trim() === htmlRoomName,
-    );
+    columnIndex = atTitleMatches.findIndex((m) => m[1].trim() === htmlRoomName);
     if (columnIndex === -1) return new Set();
   }
 
   // avl-data-slot 블록별 시간 + 버튼 파싱
   const unavailableTimes = new Set<string>();
-  const blocks = html.split('<div class="avl-data-slot"');
+  const blocks = html.split(/\<div class=['"]avl-data-slot['"]/);
   blocks.shift(); // 첫 번째 요소는 슬롯 이전 HTML
 
   for (const block of blocks) {
-    const timeMatch = block.match(/<div class="avl-time">([^<]+)<\/div>/);
+    const timeMatch = block.match(/<div class=['"]avl-time['"]>([^<]+)<\/div>/);
     if (!timeMatch) continue;
     const time = timeMatch[1].trim(); // "09:00"
 
     const buttonMatches = [
-      ...block.matchAll(/<div class="avl-button">([\s\S]*?)<\/div>/g),
+      ...block.matchAll(/<div class=['"]avl-button['"]>([\s\S]*?)<\/div>/g),
     ];
     const buttons = buttonMatches.map((m) => m[1]);
 

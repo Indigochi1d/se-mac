@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { STUDY_ROOMS } from "@/constants/studyroom";
-import { getNextWeekDate, generateRecurringDates } from "@/lib/date";
+import { generateRecurringDates } from "@/lib/date";
 import type { Companion } from "@/components/reservation/CompanionInput";
 
 interface SubmitResult {
@@ -130,9 +130,11 @@ export const useReservation = () => {
             (r: { status: string }) => r.status === "failed",
           );
 
+        const isActualSuccess = !(allImmediateFailed && scheduledCount === 0);
+
         setSubmitResult({
-          success: !(allImmediateFailed && scheduledCount === 0),
-          message: data.message,
+          success: isActualSuccess,
+          message: isActualSuccess ? data.message : "예약에 실패했습니다.",
           immediateResults,
           scheduledCount,
         });
