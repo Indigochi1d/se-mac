@@ -244,6 +244,7 @@ export async function POST(request: NextRequest) {
     const submittableDates = [...immediateDates].filter(
       (d) => !conflictDates.has(d),
     );
+    const failedImmediateDates = new Set<string>();
 
     if (submittableDates.length > 0) {
       try {
@@ -295,13 +296,14 @@ export async function POST(request: NextRequest) {
               });
             } else {
               await supabase
-                .from("reservations")
-                .update({ status: "failed", error_message: result.message })
-                .eq("id", reservationId);
-              await supabase
                 .from("reserved_slots")
                 .delete()
                 .eq("reservation_id", reservationId);
+              await supabase
+                .from("reservations")
+                .delete()
+                .eq("id", reservationId);
+              failedImmediateDates.add(date);
               immediateResults.push({
                 date,
                 status: "failed",
@@ -312,31 +314,30 @@ export async function POST(request: NextRequest) {
             const message =
               error instanceof Error ? error.message : "알 수 없는 에러";
             await supabase
-              .from("reservations")
-              .update({ status: "failed", error_message: message })
-              .eq("id", reservationId);
-            await supabase
               .from("reserved_slots")
               .delete()
               .eq("reservation_id", reservationId);
+            await supabase
+              .from("reservations")
+              .delete()
+              .eq("id", reservationId);
+            failedImmediateDates.add(date);
             immediateResults.push({ date, status: "failed", message });
           }
         }
       } catch {
-        // 도서관 로그인 실패 → 충돌 없는 즉시 예약 대상을 failed 처리
+        // 도서관 로그인 실패 → 충돌 없는 즉시 예약 대상 레코드 삭제
         for (const date of submittableDates) {
           const reservationId = reservationMap.get(date)!;
-          await supabase
-            .from("reservations")
-            .update({
-              status: "failed",
-              error_message: "도서관 로그인 실패",
-            })
-            .eq("id", reservationId);
           await supabase
             .from("reserved_slots")
             .delete()
             .eq("reservation_id", reservationId);
+          await supabase
+            .from("reservations")
+            .delete()
+            .eq("id", reservationId);
+          failedImmediateDates.add(date);
           immediateResults.push({
             date,
             status: "failed",
@@ -346,8 +347,13 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const insertedDates = dates.filter((d) => !conflictDates.has(d));
-    const scheduledCount = insertedDates.length - submittableDates.length;
+    const insertedDates = dates.filter(
+      (d) => !conflictDates.has(d) && !failedImmediateDates.has(d),
+    );
+    const successfulImmediateCount = immediateResults.filter(
+      (r) => r.status === "success",
+    ).length;
+    const scheduledCount = insertedDates.length - successfulImmediateCount;
 
     // 이메일 알림 발송
     if (notificationEmail && immediateResults.length > 0) {
