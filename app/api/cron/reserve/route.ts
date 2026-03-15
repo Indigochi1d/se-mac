@@ -3,6 +3,7 @@ import supabase from "@/lib/db";
 import { decrypt } from "@/lib/crypto";
 import { loginToPortal, loginToLibseat } from "@/lib/sejong/auth";
 import { submitReservation } from "@/lib/sejong/reserve";
+import { fetchReserveNo } from "@/lib/sejong/myseat";
 import { sendReservationEmail } from "@/lib/email";
 
 /** 예약은 7일 전에 수행 (KST 기준 오늘 + 7일) */
@@ -183,7 +184,15 @@ export async function GET(request: NextRequest) {
         });
 
         if (result.success) {
-          await updateStatus(res.id, "success");
+          const reserveNo = await fetchReserveNo({
+            token: libseatSession.token,
+            phpSessId: libseatSession.phpSessId,
+            date: res.reservation_date,
+            roomId: res.room_id,
+            startTime: res.start_time,
+            hours: res.hours,
+          });
+          await updateStatus(res.id, "success", undefined, reserveNo);
           results.push({
             reservationId: res.id,
             status: "success",
