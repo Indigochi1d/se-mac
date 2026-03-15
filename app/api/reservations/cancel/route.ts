@@ -3,20 +3,19 @@ import { NextRequest, NextResponse } from "next/server";
 import supabase from "@/lib/db";
 import { decrypt } from "@/lib/crypto";
 import { loginToPortal, loginToLibseat } from "@/lib/sejong/auth";
+import { cancelLibseatReservation } from "@/lib/sejong/cancel";
 
 interface CancelRequest {
   reservationId: number;
-  cancelMsg?: string;
 }
 
 export async function DELETE(request: NextRequest) {
   try {
     // 1. 인증 확인
     const cookieStore = await cookies();
-    const ssotoken = cookieStore.get("ssotoken")?.value;
     const studentId = cookieStore.get("student_id")?.value;
 
-    if (!ssotoken || !studentId) {
+    if (!studentId) {
       return NextResponse.json(
         { success: false, message: "인증이 필요합니다. 다시 로그인해주세요." },
         { status: 401 },
@@ -25,7 +24,7 @@ export async function DELETE(request: NextRequest) {
 
     // 2. 요청 바디 파싱
     const body: CancelRequest = await request.json();
-    const { reservationId, cancelMsg = "예약 취소" } = body;
+    const { reservationId } = body;
 
     if (!reservationId) {
       return NextResponse.json(
@@ -38,7 +37,7 @@ export async function DELETE(request: NextRequest) {
     const { data: reservation, error: queryError } = await supabase
       .from("reservations")
       .select(
-        "id, status, booking_id, room_id, student_id, reservation_credentials ( password )",
+        "id, status, booking_id, student_id, reservation_credentials ( password )",
       )
       .eq("id", reservationId)
       .single();
@@ -73,10 +72,8 @@ export async function DELETE(request: NextRequest) {
       );
     }
 
-    // 6. booking_id가 있으면 도서관 취소 API 호출 (status와 관계없이)
-
+    // 6. booking_id가 있으면 도서관 취소 API 호출
     if (reservation.booking_id) {
-      // 비밀번호 복호화
       const cred = reservation.reservation_credentials;
       const credRecord = Array.isArray(cred) ? cred[0] : cred;
 
@@ -106,9 +103,9 @@ export async function DELETE(request: NextRequest) {
         );
       }
 
-      // libseat 로그인으로 PHPSESSID 획득
-      const phpSessId = await loginToLibseat(newSsotoken);
-      if (!phpSessId) {
+      // libseat 로그인으로 token + PHPSESSID 획득
+      const session = await loginToLibseat(newSsotoken);
+      if (!session) {
         return NextResponse.json(
           { success: false, message: "도서관 인증에 실패했습니다." },
           { status: 500 },
@@ -116,43 +113,22 @@ export async function DELETE(request: NextRequest) {
       }
 
       // 도서관 취소 요청
-      const cancelFormData = new URLSearchParams({
-        cancelMsg: cancelMsg,
-        bookingId: reservation.booking_id,
-        expired: "C",
-        roomId: reservation.room_id,
-        mode: "update",
-        classId: "0",
+      const cancelResult = await cancelLibseatReservation({
+        userID: studentId,
+        reserveNo: reservation.booking_id,
+        token: session.token,
+        phpSessId: session.phpSessId,
       });
 
-      const cancelResponse = await fetch(
-        process.env.SEJONG_LIBSEAT_RESERVE_URL!,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/x-www-form-urlencoded",
-            Cookie: `ssotoken=${newSsotoken}; PHPSESSID=${phpSessId}`,
-          },
-          body: cancelFormData.toString(),
-        },
-      );
-
-      // 취소 결과 확인
-      const xJson = cancelResponse.headers.get("X-JSON");
-      const responseBody = await cancelResponse.text();
-
-      if (!xJson || !xJson.includes("true")) {
+      if (!cancelResult.success) {
         return NextResponse.json(
-          {
-            success: false,
-            message: responseBody.trim() || "도서관 예약 취소에 실패했습니다.",
-          },
+          { success: false, message: cancelResult.message },
           { status: 400 },
         );
       }
     }
 
-    // 7. DB 상태 업데이트 (pending, success 모두)
+    // 7. DB 상태 업데이트
     const { error: updateError } = await supabase
       .from("reservations")
       .update({ status: "cancelled" })

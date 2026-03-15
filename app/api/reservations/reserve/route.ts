@@ -5,6 +5,7 @@ import supabase from "@/lib/db";
 import { generateRecurringDates } from "@/lib/date";
 import { loginToLibseat } from "@/lib/sejong/auth";
 import { submitReservation } from "@/lib/sejong/reserve";
+import { fetchReserveNo } from "@/lib/sejong/myseat";
 import { generateSlotTimes } from "@/lib/slot";
 import { getLibseatUnavailableTimes } from "@/lib/sejong/availability";
 import { sendReservationEmail } from "@/lib/email";
@@ -272,9 +273,20 @@ export async function POST(request: NextRequest) {
             });
 
             if (result.success) {
+              const reserveNo = await fetchReserveNo({
+                token: session.token,
+                phpSessId: session.phpSessId,
+                date,
+                roomId: studyRoomId,
+                startTime,
+                hours,
+              });
               await supabase
                 .from("reservations")
-                .update({ status: "success" })
+                .update({
+                  status: "success",
+                  ...(reserveNo && { booking_id: reserveNo }),
+                })
                 .eq("id", reservationId);
               immediateResults.push({
                 date,

@@ -111,6 +111,7 @@ export async function submitReservation(
     const msgMatch = body.match(
       /<resultMsg><!\[CDATA\[([\s\S]*?)\]\]><\/resultMsg>/,
     );
+
     const resultCode = codeMatch ? parseInt(codeMatch[1], 10) : -1;
     const resultMsg = msgMatch ? msgMatch[1].trim() : body;
 
