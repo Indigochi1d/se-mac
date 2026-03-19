@@ -77,7 +77,7 @@ export async function getLibseatUnavailableTimes(
  *
  * STUDY_ROOMS.name "스터디룸 07" ↔ HTML span "07스터디룸"
  */
-function parseUnavailableTimesForRoom(
+export function parseUnavailableTimesForRoom(
   html: string,
   roomName: string,
 ): Set<string> {
