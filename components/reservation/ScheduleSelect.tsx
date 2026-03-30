@@ -1,5 +1,6 @@
 "use client";
 
+import { useMemo, useCallback } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -32,35 +33,37 @@ export const ScheduleSelect = ({
 }: ScheduleSelectProps) => {
   const lastSlot = TIME_SLOTS[TIME_SLOTS.length - 1];
 
-  const isSlotDisabled = (time: string) => occupiedSlots.includes(time);
+  const occupiedSet = useMemo(() => new Set(occupiedSlots), [occupiedSlots]);
 
   // 2시간 선택 가능 여부: 마지막 슬롯이 아니고, 다음 슬롯도 비어있어야 함
-  const canSelectTwoHours = (() => {
+  const canSelectTwoHours = useMemo(() => {
     if (!startTime || startTime === lastSlot) return false;
     const idx = TIME_SLOTS.indexOf(startTime);
     if (idx === -1 || idx + 1 >= TIME_SLOTS.length) return false;
-    return !isSlotDisabled(TIME_SLOTS[idx + 1]);
-  })();
+    return !occupiedSet.has(TIME_SLOTS[idx + 1]);
+  }, [startTime, lastSlot, occupiedSet]);
 
   // 시간 버튼 클릭 시: 2시간 모드에서 다음 슬롯이 점유되어 있으면 1시간으로 전환
-  const handleTimeClick = (time: string) => {
-    onStartTimeChange(time);
-    if (hours === 2) {
-      const idx = TIME_SLOTS.indexOf(time);
-      const nextSlot = TIME_SLOTS[idx + 1];
-      if (!nextSlot || isSlotDisabled(nextSlot)) {
-        onHoursChange(1);
+  const handleTimeClick = useCallback(
+    (time: string) => {
+      onStartTimeChange(time);
+      if (hours === 2) {
+        const idx = TIME_SLOTS.indexOf(time);
+        const nextSlot = TIME_SLOTS[idx + 1];
+        if (!nextSlot || occupiedSet.has(nextSlot)) {
+          onHoursChange(1);
+        }
       }
-    }
-  };
+    },
+    [hours, occupiedSet, onStartTimeChange, onHoursChange],
+  );
 
   // 종료일 최소값: 다음 주 해당 요일
-  const minEndDate = selectedDay
-    ? (() => {
-        const { year, month, day } = getNextWeekDate(selectedDay);
-        return `${year}-${month}-${day}`;
-      })()
-    : undefined;
+  const minEndDate = useMemo(() => {
+    if (!selectedDay) return undefined;
+    const { year, month, day } = getNextWeekDate(selectedDay);
+    return `${year}-${month}-${day}`;
+  }, [selectedDay]);
 
   return (
     <div className="space-y-4">
@@ -89,7 +92,7 @@ export const ScheduleSelect = ({
         </p>
         <div className="flex gap-2 flex-wrap">
           {TIME_SLOTS.map((time) => {
-            const disabled = isSlotDisabled(time);
+            const disabled = occupiedSet.has(time);
             const selected = startTime === time;
             return (
               <Button

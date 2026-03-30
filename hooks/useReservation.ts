@@ -62,13 +62,9 @@ export const useReservation = () => {
         );
         const json = await res.json();
         if (json.success) {
-          const allSlots = new Set<string>();
-          for (const slots of Object.values(json.data) as string[][]) {
-            for (const slot of slots) {
-              allSlots.add(slot);
-            }
-          }
-          setOccupiedSlots(Array.from(allSlots));
+          setOccupiedSlots([
+            ...new Set((Object.values(json.data) as string[][]).flat()),
+          ]);
         }
       } catch {
         setOccupiedSlots([]);

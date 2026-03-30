@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+
+const NON_DIGIT = /\D/g;
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -69,7 +71,7 @@ export const CompanionInput = ({
         <Input
           placeholder="학번"
           value={studentId}
-          onChange={(e) => setStudentId(e.target.value.replace(/\D/g, ""))}
+          onChange={(e) => setStudentId(e.target.value.replace(NON_DIGIT, ""))}
           inputMode="numeric"
           className="flex-1"
         />

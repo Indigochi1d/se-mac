@@ -141,13 +141,18 @@ export async function POST(request: NextRequest) {
     }> = [];
     const conflictDates = new Set<string>();
 
-    for (const date of immediateDates) {
-      const reserveDate = date.replace(/-/g, "");
-      const unavailableTimes = await getLibseatUnavailableTimes(
-        studyRoomId,
-        reserveDate,
-      );
+    const availabilityResults = await Promise.all(
+      [...immediateDates].map(async (date) => {
+        const reserveDate = date.replace(/-/g, "");
+        const unavailableTimes = await getLibseatUnavailableTimes(
+          studyRoomId,
+          reserveDate,
+        );
+        return { date, unavailableTimes };
+      }),
+    );
 
+    for (const { date, unavailableTimes } of availabilityResults) {
       const conflictTime = generateSlotTimes(startTime, hours).find((t) =>
         unavailableTimes.has(t),
       );

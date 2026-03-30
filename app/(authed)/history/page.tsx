@@ -114,10 +114,7 @@ const HistoryPage = () => {
                     </AccordionTrigger>
                     <AccordionContent>
                       <div className="space-y-2">
-                        {group.reservations
-                          .slice()
-                          .sort((a, b) => a.date.localeCompare(b.date))
-                          .map((reservation) => {
+                        {group.reservations.map((reservation) => {
                             const config = STATUS_CONFIG[reservation.status];
                             return (
                               <div
