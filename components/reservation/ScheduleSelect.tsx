@@ -124,7 +124,7 @@ export const ScheduleSelect = ({
       </div>
 
       <div className="space-y-2">
-        <Label>종료 날짜</Label>
+        <Label>반복 예약 종료 날짜</Label>
         <Input
           type="date"
           value={endDate}
