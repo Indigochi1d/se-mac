@@ -198,6 +198,47 @@ describe("POST /api/reservations/reserve - 슬롯 충돌", () => {
     expect(failed?.length).toBeGreaterThan(0);
   });
 
+  it("여러 날짜가 즉시예약 대상일 때 모든 날짜의 가용성을 체크함", async () => {
+    makeDbChain();
+    // 오늘을 2026-03-27로 설정 → schedulableFrom = 2026-04-03
+    // 두 날짜(2026-03-26, 2026-04-02) 모두 2026-04-03 이전 → 즉시예약 대상
+    jest.setSystemTime(new Date("2026-03-27T10:00:00"));
+
+    const res = await POST(makeRequest(validBody));
+    expect(res.status).toBe(200);
+    expect(mockGetUnavailableTimes).toHaveBeenCalledTimes(2);
+    expect(mockGetUnavailableTimes).toHaveBeenCalledWith("4", "20260326");
+    expect(mockGetUnavailableTimes).toHaveBeenCalledWith("4", "20260402");
+  });
+
+  it("여러 날짜 중 일부만 충돌 → 충돌 날짜만 failed, 나머지는 예약 진행", async () => {
+    makeDbChain();
+    jest.setSystemTime(new Date("2026-03-27T10:00:00"));
+
+    mockGetUnavailableTimes.mockImplementation((_roomId: string, date: string) => {
+      if (date === "20260326") return Promise.resolve(new Set(["14:00", "15:00"]));
+      return Promise.resolve(new Set());
+    });
+
+    const res = await POST(makeRequest(validBody));
+    const json = await res.json();
+    expect(res.status).toBe(200);
+
+    type ImmediateResult = { date: string; status: string };
+    const results: ImmediateResult[] = json.data?.immediateResults ?? [];
+    const failedDates = results.filter((r) => r.status === "failed").map((r) => r.date);
+    const successDates = results.filter((r) => r.status === "success").map((r) => r.date);
+    expect(failedDates).toContain("2026-03-26");
+    expect(successDates).toContain("2026-04-02");
+  });
+
+  it("가용성 체크 중 예외 발생 시 500 반환", async () => {
+    makeDbChain();
+    mockGetUnavailableTimes.mockRejectedValue(new Error("libseat 응답 오류"));
+    const res = await POST(makeRequest(validBody));
+    expect(res.status).toBe(500);
+  });
+
   it("DB UNIQUE 위반 → 409", async () => {
     mockCookieGet.mockImplementation((name: string) => {
       if (name === "ssotoken") return { value: "sso-tok" };
