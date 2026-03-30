@@ -44,10 +44,10 @@ export function LoginForm({
         router.push("/");
       } else {
         setError(data.message);
+        setIsLoading(false);
       }
     } catch {
       setError("네트워크 오류가 발생했습니다.");
-    } finally {
       setIsLoading(false);
     }
   };
