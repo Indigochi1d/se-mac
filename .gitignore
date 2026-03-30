@@ -10,6 +10,11 @@
 !.yarn/releases
 !.yarn/versions
 
+# agents
+/.claude/
+/.agents/
+skills-lock.json
+
 # testing
 /coverage
 /playwright-report
