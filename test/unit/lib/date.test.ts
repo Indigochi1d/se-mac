@@ -78,6 +78,23 @@ describe("generateRecurringDates", () => {
       expect(diff).toBe(7);
     }
   });
+
+  it("startDate를 지정하면 해당 날짜부터 시작", () => {
+    // 오늘: 2026-03-19 (목), 다음 목요일: 2026-03-26
+    // startDate를 2026-04-02로 지정 → 2026-03-26 건너뜀
+    const dates = generateRecurringDates("thu", "2026-04-16", "2026-04-02");
+    expect(dates).toEqual(["2026-04-02", "2026-04-09", "2026-04-16"]);
+  });
+
+  it("startDate가 endDate와 같으면 단일 날짜 반환", () => {
+    const dates = generateRecurringDates("thu", "2026-03-26", "2026-03-26");
+    expect(dates).toEqual(["2026-03-26"]);
+  });
+
+  it("startDate가 undefined이면 기존 동작 유지", () => {
+    const dates = generateRecurringDates("thu", "2026-04-16", undefined);
+    expect(dates).toEqual(["2026-03-26", "2026-04-02", "2026-04-09", "2026-04-16"]);
+  });
 });
 
 describe("formatDate", () => {

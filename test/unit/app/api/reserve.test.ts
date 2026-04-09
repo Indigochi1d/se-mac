@@ -47,6 +47,7 @@ jest.mock("@/lib/email", () => ({
 
 import { NextRequest } from "next/server";
 import { POST } from "@/app/api/reservations/reserve/route";
+import { generateRecurringDates } from "@/lib/date";
 
 const validBody = {
   studyRoomId: "4",
@@ -175,6 +176,31 @@ describe("POST /api/reservations/reserve - 입력값 검증", () => {
     expect(res.status).toBe(400);
     const json = await res.json();
     expect(json.message).toContain("요일");
+  });
+
+  it("startDate가 selectedDay와 다른 요일이면 400 반환", async () => {
+    // selectedDay: "mon"(월=1), startDate: "2026-03-26"(목=4) → 불일치
+    const res = await POST(makeRequest({ ...validBody, startDate: "2026-03-26" }));
+    expect(res.status).toBe(400);
+    const json = await res.json();
+    expect(json.message).toMatch(/요일/);
+  });
+});
+
+describe("POST /api/reservations/reserve - startDate 전달", () => {
+  beforeEach(() => makeDbChain());
+
+  it("startDate가 올바른 요일이면 generateRecurringDates에 startDate 전달", async () => {
+    // selectedDay: "mon", startDate: "2026-03-23"(월)
+    const req = makeRequest({ ...validBody, startDate: "2026-03-23" });
+    await POST(req);
+    expect(generateRecurringDates).toHaveBeenCalledWith("mon", "2026-06-30", "2026-03-23");
+  });
+
+  it("startDate 없으면 generateRecurringDates에 undefined 전달 (기존 동작)", async () => {
+    const req = makeRequest(validBody);
+    await POST(req);
+    expect(generateRecurringDates).toHaveBeenCalledWith("mon", "2026-06-30", undefined);
   });
 });
 
