@@ -18,6 +18,7 @@ interface Companion {
 interface ReservationRequest {
   studyRoomId: string;
   selectedDay: string;
+  startDate?: string;
   startTime: string;
   hours: number;
   companions: Companion[];
@@ -61,6 +62,7 @@ export async function POST(request: NextRequest) {
     const {
       studyRoomId,
       selectedDay,
+      startDate,
       startTime,
       hours,
       companions,
@@ -100,8 +102,19 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    if (startDate) {
+      const DAY_MAP: Record<string, number> = { mon: 1, tue: 2, wed: 3, thu: 4, fri: 5 };
+      const picked = new Date(startDate + "T00:00:00");
+      if (picked.getDay() !== DAY_MAP[selectedDay]) {
+        return NextResponse.json(
+          { success: false, message: "시작 날짜가 선택한 요일과 일치하지 않습니다." },
+          { status: 400 },
+        );
+      }
+    }
+
     // 3. 반복 날짜 생성
-    const dates = generateRecurringDates(selectedDay, endDate);
+    const dates = generateRecurringDates(selectedDay, endDate, startDate);
 
     if (dates.length === 0) {
       return NextResponse.json(

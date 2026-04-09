@@ -15,10 +15,20 @@ interface ScheduleSelectProps {
   onStartTimeChange: (time: string) => void;
   hours: number;
   onHoursChange: (hours: number) => void;
+  startDate: string;
+  onStartDateChange: (date: string) => void;
   endDate: string;
   onEndDateChange: (date: string) => void;
   occupiedSlots: string[];
 }
+
+const DAY_JS_MAP: Record<string, number> = {
+  mon: 1,
+  tue: 2,
+  wed: 3,
+  thu: 4,
+  fri: 5,
+};
 
 export const ScheduleSelect = ({
   selectedDay,
@@ -27,6 +37,8 @@ export const ScheduleSelect = ({
   onStartTimeChange,
   hours,
   onHoursChange,
+  startDate,
+  onStartDateChange,
   endDate,
   onEndDateChange,
   occupiedSlots,
@@ -58,12 +70,30 @@ export const ScheduleSelect = ({
     [hours, occupiedSet, onStartTimeChange, onHoursChange],
   );
 
-  // 종료일 최소값: 다음 주 해당 요일
-  const minEndDate = useMemo(() => {
+  // 시작일 최소값: 다음 가능 날짜
+  const minStartDate = useMemo(() => {
     if (!selectedDay) return undefined;
     const { year, month, day } = getNextWeekDate(selectedDay);
     return `${year}-${month}-${day}`;
   }, [selectedDay]);
+
+  // 종료일 최소값: startDate 기준 (없으면 minStartDate)
+  const minEndDate = useMemo(
+    () => startDate || minStartDate,
+    [startDate, minStartDate],
+  );
+
+  // 시작일 변경: 선택한 요일과 다른 날짜면 무시
+  const handleStartDateChange = useCallback(
+    (value: string) => {
+      if (!value) return;
+      if (new Date(value + "T00:00:00").getDay() !== DAY_JS_MAP[selectedDay])
+        return;
+      onStartDateChange(value);
+      if (endDate && value > endDate) onEndDateChange("");
+    },
+    [selectedDay, endDate, onStartDateChange, onEndDateChange],
+  );
 
   return (
     <div className="space-y-4">
@@ -124,6 +154,19 @@ export const ScheduleSelect = ({
             2시간
           </Button>
         </div>
+      </div>
+      <div className="space-y-2">
+        <Label>반복 예약 시작 날짜</Label>
+        <Input
+          type="date"
+          value={startDate}
+          onChange={(e) => handleStartDateChange(e.target.value)}
+          min={minStartDate}
+          disabled={!selectedDay}
+        />
+        <p className="text-sm text-muted-foreground">
+          선택한 요일에 해당하는 날짜만 선택할 수 있어요.
+        </p>
       </div>
 
       <div className="space-y-2">

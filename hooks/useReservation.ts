@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { STUDY_ROOMS } from "@/constants/studyroom";
-import { generateRecurringDates } from "@/lib/date";
+import { generateRecurringDates, getNextWeekDate } from "@/lib/date";
 import type { Companion } from "@/components/reservation/CompanionInput";
 
 interface SubmitResult {
@@ -17,6 +17,7 @@ interface SubmitResult {
 export const useReservation = () => {
   const [studyRoomId, setStudyRoomId] = useState("");
   const [selectedDay, setSelectedDay] = useState("");
+  const [startDate, setStartDate] = useState("");
   const [startTime, setStartTime] = useState("");
   const [hours, setHours] = useState(1);
   const [endDate, setEndDate] = useState("");
@@ -29,9 +30,17 @@ export const useReservation = () => {
 
   const selectedRoom = STUDY_ROOMS.find((room) => room.id === studyRoomId);
 
+  const handleDayChange = (day: string) => {
+    setSelectedDay(day);
+    const { year, month, day: d } = getNextWeekDate(day);
+    setStartDate(`${year}-${month}-${d}`);
+    setEndDate("");
+  };
+
   const handleResetForm = () => {
     setStudyRoomId("");
     setSelectedDay("");
+    setStartDate("");
     setStartTime("");
     setHours(1);
     setEndDate("");
@@ -42,14 +51,14 @@ export const useReservation = () => {
     setSubmitResult(null);
   };
 
-  // 룸 + 요일 + 종료일이 모두 선택되면 점유 슬롯 조회
+  // 룸 + 요일 + 시작일 + 종료일이 모두 선택되면 점유 슬롯 조회
   useEffect(() => {
-    if (!studyRoomId || !selectedDay || !endDate) {
+    if (!studyRoomId || !selectedDay || !startDate || !endDate) {
       setOccupiedSlots([]);
       return;
     }
 
-    const dates = generateRecurringDates(selectedDay, endDate);
+    const dates = generateRecurringDates(selectedDay, endDate, startDate);
     if (dates.length === 0) {
       setOccupiedSlots([]);
       return;
@@ -72,12 +81,13 @@ export const useReservation = () => {
     };
 
     fetchSlots();
-  }, [studyRoomId, selectedDay, endDate]);
+  }, [studyRoomId, selectedDay, startDate, endDate]);
 
   // 유효성 검사
   const isValid = (() => {
     if (!studyRoomId) return false;
     if (!selectedDay) return false;
+    if (!startDate) return false;
     if (!startTime) return false;
     if (!endDate) return false;
     if (!reason.trim()) return false;
@@ -104,6 +114,7 @@ export const useReservation = () => {
         body: JSON.stringify({
           studyRoomId,
           selectedDay,
+          startDate,
           startTime,
           hours,
           companions,
@@ -155,6 +166,9 @@ export const useReservation = () => {
     setStudyRoomId,
     selectedDay,
     setSelectedDay,
+    handleDayChange,
+    startDate,
+    setStartDate,
     startTime,
     setStartTime,
     hours,

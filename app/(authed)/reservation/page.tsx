@@ -27,7 +27,9 @@ const ReservationPage = () => {
     studyRoomId,
     setStudyRoomId,
     selectedDay,
-    setSelectedDay,
+    handleDayChange,
+    startDate,
+    setStartDate,
     startTime,
     setStartTime,
     hours,
@@ -72,7 +74,9 @@ const ReservationPage = () => {
 
           <ScheduleSelect
             selectedDay={selectedDay}
-            onDayChange={setSelectedDay}
+            onDayChange={handleDayChange}
+            startDate={startDate}
+            onStartDateChange={setStartDate}
             startTime={startTime}
             onStartTimeChange={setStartTime}
             hours={hours}

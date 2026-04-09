@@ -49,17 +49,24 @@ export const getNextWeekDate = (
 };
 
 /**
- * 특정 요일에 해당하는 모든 날짜를 생성 (다음 주 ~ 종료일)
+ * 특정 요일에 해당하는 모든 날짜를 생성 (시작일 ~ 종료일)
  * @param dayId - 요일 ID (mon, tue, wed, thu, fri)
  * @param endDate - 종료 날짜 (YYYY-MM-DD 형식)
+ * @param startDate - 시작 날짜 (YYYY-MM-DD 형식, 미제공 시 다음 가능 날짜 자동 계산)
  * @returns string[] - "YYYY-MM-DD" 형식의 날짜 배열
  */
 export const generateRecurringDates = (
   dayId: string,
   endDate: string,
+  startDate?: string,
 ): string[] => {
-  const { year, month, day } = getNextWeekDate(dayId);
-  const current = new Date(`${year}-${month}-${day}`);
+  let current: Date;
+  if (startDate) {
+    current = new Date(startDate + "T00:00:00");
+  } else {
+    const { year, month, day } = getNextWeekDate(dayId);
+    current = new Date(`${year}-${month}-${day}`);
+  }
   const end = new Date(endDate);
 
   const dates: string[] = [];
