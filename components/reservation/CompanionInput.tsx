@@ -104,7 +104,7 @@ export const CompanionInput = ({
               </span>
               <Button
                 type="button"
-                variant="ghost"
+                variant="destructive"
                 size="sm"
                 onClick={() => handleRemove(companion.studentId)}
               >

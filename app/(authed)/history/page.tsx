@@ -29,6 +29,7 @@ import {
 import { STUDY_ROOMS } from "@/constants/studyroom";
 import { formatDate, getEndTime, isFutureReservation } from "@/lib/date";
 import { useHistory } from "@/hooks/useHistory";
+import { ReservationDetailModal } from "@/components/reservation/ReservationDetailModal";
 
 const STATUS_CONFIG = {
   pending: { label: "대기", variant: "outline" as const },
@@ -38,7 +39,7 @@ const STATUS_CONFIG = {
 } as const;
 
 const getRoomName = (roomId: string) =>
-  STUDY_ROOMS.find((r) => r.id === roomId)?.name ?? `룸 ${roomId}`;
+  STUDY_ROOMS.find((room) => room.id === roomId)?.name ?? `룸 ${roomId}`;
 
 const HistoryPage = () => {
   const router = useRouter();
@@ -50,6 +51,14 @@ const HistoryPage = () => {
     setCancelTarget,
     openCancelModal,
     confirmCancel,
+    detailModalTarget,
+    reservationDetail,
+    isLoadingDetail,
+    isEditSaving,
+    editProgressStep,
+    openDetailModal,
+    closeDetailModal,
+    saveEditedCompanions,
   } = useHistory();
 
   return (
@@ -80,7 +89,7 @@ const HistoryPage = () => {
             <Accordion type="multiple" className="w-full">
               {activeGroups.map((group) => {
                 const successCount = group.reservations.filter(
-                  (r) => r.status === "success",
+                  (reservation) => reservation.status === "success",
                 ).length;
                 const totalCount = group.reservations.length;
                 const firstDate = group.reservations[0].date;
@@ -115,44 +124,64 @@ const HistoryPage = () => {
                     <AccordionContent>
                       <div className="space-y-2">
                         {group.reservations.map((reservation) => {
-                            const config = STATUS_CONFIG[reservation.status];
-                            return (
-                              <div
-                                key={reservation.date}
-                                className="flex items-center justify-between rounded-md border px-3 py-2"
-                              >
-                                <span className="flex items-center gap-2 text-sm">
-                                  <Calendar className="size-3.5 text-muted-foreground" />
-                                  {formatDate(reservation.date)}
-                                </span>
-                                <div className="flex items-center gap-2">
-                                  <Badge variant={config.variant}>
-                                    {config.label}
-                                  </Badge>
-                                  {(reservation.status === "pending" ||
-                                    (reservation.status === "success" &&
-                                      isFutureReservation(reservation.date, group.startTime))) && (
-                                    <Button
-                                      variant="destructive"
-                                      size="sm"
-                                      className="h-7 px-2 text-xs"
-                                      disabled={cancellingId === reservation.id}
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        openCancelModal(reservation, group.startTime);
-                                      }}
-                                    >
-                                      {cancellingId === reservation.id ? (
-                                        <Loader2 className="size-3 animate-spin" />
-                                      ) : (
-                                        "예약 취소"
-                                      )}
-                                    </Button>
-                                  )}
-                                </div>
+                          const statusConfig = STATUS_CONFIG[reservation.status];
+                          const isReservationCancellable =
+                            reservation.status === "pending" ||
+                            (reservation.status === "success" &&
+                              isFutureReservation(
+                                reservation.date,
+                                group.startTime,
+                              ));
+
+                          return (
+                            <div
+                              key={reservation.date}
+                              className="flex items-center justify-between rounded-md border px-3 py-2"
+                            >
+                              <span className="flex items-center gap-2 text-sm">
+                                <Calendar className="size-3.5 text-muted-foreground" />
+                                {formatDate(reservation.date)}
+                              </span>
+                              <div className="flex items-center gap-2">
+                                <Badge variant={statusConfig.variant}>
+                                  {statusConfig.label}
+                                </Badge>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className="h-7 px-2 text-xs"
+                                  onClick={(event) => {
+                                    event.stopPropagation();
+                                    openDetailModal(reservation, group);
+                                  }}
+                                >
+                                  상세보기
+                                </Button>
+                                {isReservationCancellable && (
+                                  <Button
+                                    variant="destructive"
+                                    size="sm"
+                                    className="h-7 px-2 text-xs"
+                                    disabled={cancellingId === reservation.id}
+                                    onClick={(event) => {
+                                      event.stopPropagation();
+                                      openCancelModal(
+                                        reservation,
+                                        group.startTime,
+                                      );
+                                    }}
+                                  >
+                                    {cancellingId === reservation.id ? (
+                                      <Loader2 className="size-3 animate-spin" />
+                                    ) : (
+                                      "예약 취소"
+                                    )}
+                                  </Button>
+                                )}
                               </div>
-                            );
-                          })}
+                            </div>
+                          );
+                        })}
                       </div>
                     </AccordionContent>
                   </AccordionItem>
@@ -163,7 +192,10 @@ const HistoryPage = () => {
         </CardContent>
       </Card>
 
-      <Dialog open={!!cancelTarget} onOpenChange={(open) => !open && setCancelTarget(null)}>
+      <Dialog
+        open={!!cancelTarget}
+        onOpenChange={(open) => !open && setCancelTarget(null)}
+      >
         <DialogContent showCloseButton={false}>
           <DialogHeader>
             <DialogTitle>예약 취소</DialogTitle>
@@ -195,6 +227,20 @@ const HistoryPage = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {detailModalTarget && (
+        <ReservationDetailModal
+          isOpen={!!detailModalTarget}
+          onClose={closeDetailModal}
+          targetReservation={detailModalTarget.reservation}
+          targetGroup={detailModalTarget.group}
+          reservationDetail={reservationDetail}
+          isLoadingDetail={isLoadingDetail}
+          isEditSaving={isEditSaving}
+          editProgressStep={editProgressStep}
+          onSaveEditedCompanions={saveEditedCompanions}
+        />
+      )}
     </div>
   );
 };
