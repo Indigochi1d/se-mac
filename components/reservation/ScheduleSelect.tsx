@@ -30,6 +30,8 @@ const DAY_JS_MAP: Record<string, number> = {
   fri: 5,
 };
 
+const lastSlot = TIME_SLOTS[TIME_SLOTS.length - 1];
+
 export const ScheduleSelect = ({
   selectedDay,
   onDayChange,
@@ -43,8 +45,6 @@ export const ScheduleSelect = ({
   onEndDateChange,
   occupiedSlots,
 }: ScheduleSelectProps) => {
-  const lastSlot = TIME_SLOTS[TIME_SLOTS.length - 1];
-
   const occupiedSet = useMemo(() => new Set(occupiedSlots), [occupiedSlots]);
 
   // 2시간 선택 가능 여부: 마지막 슬롯이 아니고, 다음 슬롯도 비어있어야 함
@@ -53,7 +53,7 @@ export const ScheduleSelect = ({
     const idx = TIME_SLOTS.indexOf(startTime);
     if (idx === -1 || idx + 1 >= TIME_SLOTS.length) return false;
     return !occupiedSet.has(TIME_SLOTS[idx + 1]);
-  }, [startTime, lastSlot, occupiedSet]);
+  }, [startTime, occupiedSet]);
 
   // 시간 버튼 클릭 시: 2시간 모드에서 다음 슬롯이 점유되어 있으면 1시간으로 전환
   const handleTimeClick = useCallback(
@@ -78,10 +78,7 @@ export const ScheduleSelect = ({
   }, [selectedDay]);
 
   // 종료일 최소값: startDate 기준 (없으면 minStartDate)
-  const minEndDate = useMemo(
-    () => startDate || minStartDate,
-    [startDate, minStartDate],
-  );
+  const minEndDate = startDate || minStartDate;
 
   // 시작일 변경: 선택한 요일과 다른 날짜면 무시
   const handleStartDateChange = useCallback(
