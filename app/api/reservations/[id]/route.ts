@@ -1,5 +1,6 @@
 import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
+import * as Sentry from "@sentry/nextjs";
 import supabase from "@/lib/db";
 import { decrypt } from "@/lib/crypto";
 import { loginToPortal, loginToLibseat } from "@/lib/sejong/auth";
@@ -231,6 +232,10 @@ export async function PATCH(
     );
 
     if (shouldRebookLibraryReservation) {
+      Sentry.addBreadcrumb({
+        message: "명단 수정 재예약 시도",
+        data: { reservationId, studentId: authenticatedStudentId },
+      });
       const credentialsRecord = Array.isArray(reservation.reservation_credentials)
         ? reservation.reservation_credentials[0]
         : reservation.reservation_credentials;
@@ -310,6 +315,13 @@ export async function PATCH(
           .update({ status: "failed", booking_id: null })
           .eq("id", reservationId);
 
+        Sentry.captureEvent({
+          message: "명단 수정 재예약 실패",
+          level: "error",
+          tags: { action: "reserve_rebook" },
+          extra: { reservationId, studentId: authenticatedStudentId, errorMessage: rebookingResult.message },
+        });
+
         return NextResponse.json(
           {
             success: false,
@@ -336,6 +348,13 @@ export async function PATCH(
           .update({ booking_id: newBookingId })
           .eq("id", reservationId);
       }
+
+      Sentry.captureEvent({
+        message: "명단 수정 재예약 성공",
+        level: "info",
+        tags: { action: "reserve_rebook" },
+        extra: { reservationId, studentId: authenticatedStudentId, companions: newCompanions },
+      });
 
       return NextResponse.json({
         success: true,

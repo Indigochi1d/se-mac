@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import * as Sentry from "@sentry/nextjs";
 import supabase from "@/lib/db";
 import { decrypt } from "@/lib/crypto";
 import { loginToPortal, loginToLibseat } from "@/lib/sejong/auth";
@@ -18,6 +19,21 @@ export async function GET(request: NextRequest) {
       { status: 401 },
     );
   }
+
+  // Sentry Crons: 작업 시작 신호
+  const checkInId = Sentry.captureCheckIn(
+    {
+      monitorSlug: "daily-reserve",
+      status: "in_progress",
+    },
+    {
+      schedule: { type: "crontab", value: "0 15 * * *" }, // 00:00 KST = 15:00 UTC
+      timezone: "Asia/Seoul",
+      checkinMargin: 5,
+      maxRuntime: 10,
+      failureIssueThreshold: 1,
+    },
+  );
 
   // 2. 타겟 날짜 계산 (KST 기준 오늘 + 7일)
   const now = new Date();
@@ -50,6 +66,11 @@ export async function GET(request: NextRequest) {
 
   if (queryError) {
     console.error("DB 조회 에러:", queryError);
+    Sentry.captureCheckIn({
+      monitorSlug: "daily-reserve",
+      status: "error",
+      checkInId,
+    });
     return NextResponse.json(
       { success: false, message: "DB 조회 실패", error: queryError.message },
       { status: 500 },
@@ -57,6 +78,11 @@ export async function GET(request: NextRequest) {
   }
 
   if (!reservations || reservations.length === 0) {
+    Sentry.captureCheckIn({
+      monitorSlug: "daily-reserve",
+      status: "ok",
+      checkInId,
+    });
     return NextResponse.json({
       success: true,
       message: `${targetDate}에 처리할 예약이 없습니다.`,
@@ -239,6 +265,12 @@ export async function GET(request: NextRequest) {
   // 6. 결과 반환
   const successCount = results.filter((r) => r.status === "success").length;
   const failedCount = results.filter((r) => r.status === "failed").length;
+
+  Sentry.captureCheckIn({
+    monitorSlug: "daily-reserve",
+    status: failedCount > 0 && successCount === 0 ? "error" : "ok",
+    checkInId,
+  });
 
   return NextResponse.json({
     success: true,

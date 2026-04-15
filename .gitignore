@@ -48,3 +48,6 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 docs
+
+# Sentry Config File
+.env.sentry-build-plugin
