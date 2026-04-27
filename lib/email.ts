@@ -1,4 +1,5 @@
 import nodemailer from "nodemailer";
+import * as Sentry from "@sentry/nextjs";
 import { STUDY_ROOMS } from "@/constants/studyroom";
 import { formatDate, getEndTime } from "@/lib/date";
 
@@ -130,5 +131,8 @@ export async function sendReservationEmail(
     });
   } catch (error) {
     console.error("이메일 발송 실패:", error);
+    Sentry.captureException(error, {
+      extra: { to, roomId, startTime, hours },
+    });
   }
 }
