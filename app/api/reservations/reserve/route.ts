@@ -1,6 +1,7 @@
 import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
 import { randomUUID } from "crypto";
+import * as Sentry from "@sentry/nextjs";
 import supabase from "@/lib/db";
 import { generateRecurringDates } from "@/lib/date";
 import { loginToLibseat } from "@/lib/sejong/auth";
@@ -265,6 +266,10 @@ export async function POST(request: NextRequest) {
     const failedImmediateDates = new Set<string>();
 
     if (submittableDates.length > 0) {
+      Sentry.addBreadcrumb({
+        message: "즉시 예약 시도",
+        data: { dates: submittableDates, studyRoomId, studentId },
+      });
       try {
         const session = await loginToLibseat(ssotoken);
         if (!session) throw new Error("도서관 로그인 실패");
@@ -307,6 +312,12 @@ export async function POST(request: NextRequest) {
                   ...(reserveNo && { booking_id: reserveNo }),
                 })
                 .eq("id", reservationId);
+              Sentry.captureEvent({
+                message: "즉시 예약 성공",
+                level: "info",
+                tags: { action: "reserve_immediate" },
+                extra: { groupId, studyRoomId, date, studentId },
+              });
               immediateResults.push({
                 date,
                 status: "success",
@@ -322,6 +333,12 @@ export async function POST(request: NextRequest) {
                 .delete()
                 .eq("id", reservationId);
               failedImmediateDates.add(date);
+              Sentry.captureEvent({
+                message: "즉시 예약 실패",
+                level: "error",
+                tags: { action: "reserve_immediate" },
+                extra: { groupId, studyRoomId, date, studentId, errorMessage: result.message },
+              });
               immediateResults.push({
                 date,
                 status: "failed",
@@ -340,6 +357,12 @@ export async function POST(request: NextRequest) {
               .delete()
               .eq("id", reservationId);
             failedImmediateDates.add(date);
+            Sentry.captureEvent({
+              message: "즉시 예약 실패",
+              level: "error",
+              tags: { action: "reserve_immediate" },
+              extra: { groupId, studyRoomId, date, studentId, errorMessage: message },
+            });
             immediateResults.push({ date, status: "failed", message });
           }
         }

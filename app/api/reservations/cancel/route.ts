@@ -1,5 +1,6 @@
 import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
+import * as Sentry from "@sentry/nextjs";
 import supabase from "@/lib/db";
 import { decrypt } from "@/lib/crypto";
 import { loginToPortal, loginToLibseat } from "@/lib/sejong/auth";
@@ -72,6 +73,11 @@ export async function DELETE(request: NextRequest) {
       );
     }
 
+    Sentry.addBreadcrumb({
+      message: "예약 취소 시도",
+      data: { reservationId, studentId },
+    });
+
     // 6. booking_id가 있으면 도서관 취소 API 호출
     if (reservation.booking_id) {
       const cred = reservation.reservation_credentials;
@@ -121,6 +127,12 @@ export async function DELETE(request: NextRequest) {
       });
 
       if (!cancelResult.success) {
+        Sentry.captureEvent({
+          message: "예약 취소 실패",
+          level: "error",
+          tags: { action: "reserve_cancel" },
+          extra: { reservationId, studentId, errorMessage: cancelResult.message },
+        });
         return NextResponse.json(
           { success: false, message: cancelResult.message },
           { status: 400 },
@@ -143,6 +155,13 @@ export async function DELETE(request: NextRequest) {
       .from("reserved_slots")
       .delete()
       .eq("reservation_id", reservationId);
+
+    Sentry.captureEvent({
+      message: "예약 취소 성공",
+      level: "info",
+      tags: { action: "reserve_cancel" },
+      extra: { reservationId, studentId },
+    });
 
     return NextResponse.json({
       success: true,
