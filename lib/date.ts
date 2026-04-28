@@ -106,3 +106,15 @@ export const isFutureReservation = (date: string, startTime: string): boolean =>
   const reservationDateTime = new Date(`${date}T${startTime}:00`);
   return reservationDateTime > new Date();
 };
+
+/**
+ * 예약 날짜가 하루 이상 지났는지 확인 (어제 이전이면 true)
+ * @param date - 예약 날짜 (YYYY-MM-DD 형식)
+ * @returns boolean - 어제 이전이면 true
+ */
+export const isMoreThanOneDayPast = (date: string): boolean => {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const reservationDate = new Date(date + "T00:00:00");
+  return reservationDate < today;
+};

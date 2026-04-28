@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { isFutureReservation } from "@/lib/date";
+import { isFutureReservation, isMoreThanOneDayPast } from "@/lib/date";
 
 export interface Reservation {
   id: number;
@@ -72,7 +72,11 @@ export const useHistory = () => {
   }, []);
 
   const activeGroups = groups.filter(
-    (group) => !group.reservations.every((reservation) => reservation.status === "cancelled"),
+    (group) =>
+      !group.reservations.every(
+        (reservation) =>
+          reservation.status === "cancelled" || isMoreThanOneDayPast(reservation.date),
+      ),
   );
 
   const openCancelModal = (reservation: Reservation, startTime: string) => {
