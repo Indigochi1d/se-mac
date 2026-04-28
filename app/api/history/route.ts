@@ -1,5 +1,6 @@
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
+import * as Sentry from "@sentry/nextjs";
 import supabase from "@/lib/db";
 
 export async function GET() {
@@ -69,7 +70,7 @@ export async function GET() {
 
     return NextResponse.json({ success: true, data: groups });
   } catch (error) {
-    console.error("예약 조회 에러:", error);
+    Sentry.captureException(error);
     return NextResponse.json(
       { success: false, message: "예약 목록을 불러올 수 없습니다." },
       { status: 500 },

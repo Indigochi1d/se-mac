@@ -60,8 +60,8 @@ export const useHistory = () => {
       if (data.success) {
         setGroups(data.data);
       }
-    } catch {
-      // TODO: 에러 처리
+    } catch (error) {
+      console.error("예약 내역 조회 실패:", error);
     } finally {
       setIsLoading(false);
     }
@@ -126,8 +126,8 @@ export const useHistory = () => {
       if (data.success) {
         setReservationDetail(data.data);
       }
-    } catch {
-      // TODO: 에러 처리
+    } catch (error) {
+      console.error("예약 상세 조회 실패:", error);
     } finally {
       setIsLoadingDetail(false);
     }

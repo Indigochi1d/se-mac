@@ -75,7 +75,8 @@ export const useReservation = () => {
             ...new Set((Object.values(json.data) as string[][]).flat()),
           ]);
         }
-      } catch {
+      } catch (error) {
+        console.error("점유 슬롯 조회 실패:", error);
         setOccupiedSlots([]);
       }
     };

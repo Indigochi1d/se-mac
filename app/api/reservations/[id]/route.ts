@@ -120,7 +120,7 @@ export async function GET(
       data: { participants },
     });
   } catch (error) {
-    console.error("예약 상세 조회 에러:", error);
+    Sentry.captureException(error);
     return NextResponse.json(
       { success: false, message: "예약 상세 조회 중 오류가 발생했습니다." },
       { status: 500 },
@@ -369,7 +369,7 @@ export async function PATCH(
       });
     }
   } catch (error) {
-    console.error("예약 수정 에러:", error);
+    Sentry.captureException(error);
     return NextResponse.json(
       { success: false, message: "예약 수정 중 오류가 발생했습니다." },
       { status: 500 },

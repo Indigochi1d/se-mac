@@ -1,5 +1,6 @@
 import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
+import * as Sentry from "@sentry/nextjs";
 import { loginToPortal, loginToLibseat } from "@/lib/sejong/auth";
 import { encrypt } from "@/lib/crypto";
 import supabase from "@/lib/db";
@@ -72,7 +73,7 @@ export async function POST(
 
     return NextResponse.json({ success: true, message: "로그인 성공" });
   } catch (error) {
-    console.error("로그인 에러:", error);
+    Sentry.captureException(error);
     return NextResponse.json(
       { success: false, message: "서버 오류가 발생했습니다." },
       { status: 500 },

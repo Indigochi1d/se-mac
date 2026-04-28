@@ -169,7 +169,8 @@ export async function GET(request: NextRequest) {
     let libseatSession: Awaited<ReturnType<typeof loginToLibseat>>;
     try {
       libseatSession = await loginToLibseat(ssotoken);
-    } catch {
+    } catch (error) {
+      Sentry.captureException(error, { extra: { studentId } });
       libseatSession = null;
     }
 

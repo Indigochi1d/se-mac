@@ -168,7 +168,7 @@ export async function DELETE(request: NextRequest) {
       message: "예약이 취소되었습니다.",
     });
   } catch (error) {
-    console.error("예약 취소 에러:", error);
+    Sentry.captureException(error);
     return NextResponse.json(
       { success: false, message: "예약 취소 중 오류가 발생했습니다." },
       { status: 500 },

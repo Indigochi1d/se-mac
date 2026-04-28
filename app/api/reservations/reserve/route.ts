@@ -221,7 +221,7 @@ export async function POST(request: NextRequest) {
       );
 
       if (slotError) {
-        console.error(slotError);
+        Sentry.captureException(slotError);
         // UNIQUE 제약조건 위반 = 이미 점유된 슬롯
         // 방금 생성한 reservation을 정리하고 에러 반환
         await supabase.from("reservations").delete().eq("id", reservation.id);
@@ -366,8 +366,9 @@ export async function POST(request: NextRequest) {
             immediateResults.push({ date, status: "failed", message });
           }
         }
-      } catch {
+      } catch (error) {
         // 도서관 로그인 실패 → 충돌 없는 즉시 예약 대상 레코드 삭제
+        Sentry.captureException(error);
         for (const date of submittableDates) {
           const reservationId = reservationMap.get(date)!;
           await supabase
@@ -420,7 +421,7 @@ export async function POST(request: NextRequest) {
       },
     });
   } catch (error) {
-    console.error("예약 등록 에러:", error);
+    Sentry.captureException(error);
     return NextResponse.json(
       { success: false, message: "예약 등록 중 오류가 발생했습니다." },
       { status: 500 },
