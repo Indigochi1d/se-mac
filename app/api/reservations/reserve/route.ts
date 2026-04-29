@@ -10,6 +10,7 @@ import { fetchReserveNo } from "@/lib/sejong/myseat";
 import { generateSlotTimes } from "@/lib/slot";
 import { getLibseatUnavailableTimes } from "@/lib/sejong/availability";
 import { sendReservationEmail } from "@/lib/email";
+import { sendReservationDiscordNotification } from "@/lib/discord";
 
 interface Companion {
   studentId: string;
@@ -26,6 +27,7 @@ interface ReservationRequest {
   reason: string;
   endDate: string;
   notificationEmail?: string;
+  notificationDiscordWebhook?: string;
 }
 
 export async function POST(request: NextRequest) {
@@ -70,6 +72,7 @@ export async function POST(request: NextRequest) {
       reason,
       endDate,
       notificationEmail,
+      notificationDiscordWebhook,
     } = body;
 
     if (
@@ -199,6 +202,7 @@ export async function POST(request: NextRequest) {
           reason,
           status: "pending",
           notification_email: notificationEmail || null,
+          notification_discord_webhook: notificationDiscordWebhook || null,
         })
         .select("id")
         .single();
@@ -397,10 +401,20 @@ export async function POST(request: NextRequest) {
     ).length;
     const scheduledCount = insertedDates.length - successfulImmediateCount;
 
-    // 이메일 알림 발송
     if (notificationEmail && immediateResults.length > 0) {
       await sendReservationEmail({
         to: notificationEmail,
+        roomId: studyRoomId,
+        startTime,
+        hours,
+        results: immediateResults,
+        scheduledCount,
+      });
+    }
+
+    if (notificationDiscordWebhook && immediateResults.length > 0) {
+      await sendReservationDiscordNotification({
+        webhookUrl: notificationDiscordWebhook,
         roomId: studyRoomId,
         startTime,
         hours,

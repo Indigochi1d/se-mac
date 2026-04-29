@@ -23,7 +23,9 @@ export const useReservation = () => {
   const [endDate, setEndDate] = useState("");
   const [companions, setCompanions] = useState<Companion[]>([]);
   const [reason, setReason] = useState("");
+  const [notificationMethod, setNotificationMethod] = useState<"none" | "email" | "discord">("none");
   const [notificationEmail, setNotificationEmail] = useState("");
+  const [notificationDiscordWebhook, setNotificationDiscordWebhook] = useState("");
   const [occupiedSlots, setOccupiedSlots] = useState<string[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitResult, setSubmitResult] = useState<SubmitResult | null>(null);
@@ -46,7 +48,9 @@ export const useReservation = () => {
     setEndDate("");
     setCompanions([]);
     setReason("");
+    setNotificationMethod("none");
     setNotificationEmail("");
+    setNotificationDiscordWebhook("");
     setOccupiedSlots([]);
     setSubmitResult(null);
   };
@@ -121,7 +125,8 @@ export const useReservation = () => {
           companions,
           reason,
           endDate,
-          notificationEmail: notificationEmail.trim() || undefined,
+          notificationEmail: notificationMethod === "email" ? notificationEmail.trim() || undefined : undefined,
+          notificationDiscordWebhook: notificationMethod === "discord" ? notificationDiscordWebhook.trim() || undefined : undefined,
         }),
       });
 
@@ -180,8 +185,12 @@ export const useReservation = () => {
     setCompanions,
     reason,
     setReason,
+    notificationMethod,
+    setNotificationMethod,
     notificationEmail,
     setNotificationEmail,
+    notificationDiscordWebhook,
+    setNotificationDiscordWebhook,
     selectedRoom,
     occupiedSlots,
     isSubmitting,

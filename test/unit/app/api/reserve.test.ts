@@ -45,6 +45,13 @@ jest.mock("@/lib/email", () => ({
   sendReservationEmail: jest.fn(async () => undefined),
 }));
 
+// lib/discord mock
+const mockSendReservationDiscordNotification = jest.fn();
+jest.mock("@/lib/discord", () => ({
+  sendReservationDiscordNotification: (...args: unknown[]) =>
+    mockSendReservationDiscordNotification(...args),
+}));
+
 import { NextRequest } from "next/server";
 import { POST } from "@/app/api/reservations/reserve/route";
 import { generateRecurringDates } from "@/lib/date";
@@ -306,5 +313,70 @@ describe("POST /api/reservations/reserve - 슬롯 충돌", () => {
 
     const res = await POST(makeRequest(validBody));
     expect(res.status).toBe(409);
+  });
+});
+
+describe("POST /api/reservations/reserve - Discord 알림", () => {
+  beforeEach(() => {
+    makeDbChain();
+    mockSendReservationDiscordNotification.mockReset();
+  });
+
+  it("notificationDiscordWebhook 있고 즉시 예약 결과 있으면 sendReservationDiscordNotification 호출", async () => {
+    const res = await POST(
+      makeRequest({
+        ...validBody,
+        notificationDiscordWebhook:
+          "https://discord.com/api/webhooks/1234567890/test-token",
+      }),
+    );
+    expect(res.status).toBe(200);
+    expect(mockSendReservationDiscordNotification).toHaveBeenCalledWith(
+      expect.objectContaining({
+        webhookUrl: "https://discord.com/api/webhooks/1234567890/test-token",
+      }),
+    );
+  });
+
+  it("notificationDiscordWebhook 없으면 sendReservationDiscordNotification 호출 안 됨", async () => {
+    await POST(makeRequest(validBody));
+    expect(mockSendReservationDiscordNotification).not.toHaveBeenCalled();
+  });
+
+  it("DB insert 시 notification_discord_webhook 컬럼에 값 저장", async () => {
+    const insertSpy = jest.fn().mockResolvedValue({ data: { id: 1 }, error: null });
+    mockDbFrom.mockImplementation((table: string) => {
+      if (table === "user_credentials") {
+        return {
+          select: jest.fn(() => ({
+            eq: jest.fn(() => ({
+              single: jest.fn().mockResolvedValue({ data: { password: "enc-pw" }, error: null }),
+            })),
+          })),
+        };
+      }
+      if (table === "reservations") {
+        return {
+          insert: jest.fn(() => ({ select: jest.fn(() => ({ single: insertSpy })) })),
+          update: jest.fn(() => ({ eq: jest.fn().mockResolvedValue({ error: null }) })),
+          delete: jest.fn(() => ({ eq: jest.fn().mockResolvedValue({ error: null }) })),
+        };
+      }
+      if (table === "reserved_slots") {
+        return {
+          insert: jest.fn().mockResolvedValue({ error: null }),
+          delete: jest.fn(() => ({ eq: jest.fn().mockResolvedValue({ error: null }) })),
+        };
+      }
+      return { insert: jest.fn().mockResolvedValue({ error: null }) };
+    });
+
+    const webhookUrl = "https://discord.com/api/webhooks/1234567890/test-token";
+    await POST(makeRequest({ ...validBody, notificationDiscordWebhook: webhookUrl }));
+
+    const reservationsInsertCall = mockDbFrom.mock.calls.find(
+      ([table]) => table === "reservations",
+    );
+    expect(reservationsInsertCall).toBeDefined();
   });
 });

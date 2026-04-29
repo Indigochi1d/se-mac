@@ -17,7 +17,7 @@ import { StudyRoomSelect } from "@/components/reservation/StudyRoomSelect";
 import { ScheduleSelect } from "@/components/reservation/ScheduleSelect";
 import { CompanionInput } from "@/components/reservation/CompanionInput";
 import { ReasonInput } from "@/components/reservation/ReasonInput";
-import { EmailInput } from "@/components/reservation/EmailInput";
+import { NotificationInput } from "@/components/reservation/NotificationInput";
 import { formatDate } from "@/lib/date";
 import { useReservation } from "@/hooks/useReservation";
 
@@ -40,8 +40,12 @@ const ReservationPage = () => {
     setCompanions,
     reason,
     setReason,
+    notificationMethod,
+    setNotificationMethod,
     notificationEmail,
     setNotificationEmail,
+    notificationDiscordWebhook,
+    setNotificationDiscordWebhook,
     selectedRoom,
     occupiedSlots,
     isSubmitting,
@@ -99,9 +103,13 @@ const ReservationPage = () => {
 
           <ReasonInput value={reason} onChange={setReason} />
 
-          <EmailInput
-            value={notificationEmail}
-            onChange={setNotificationEmail}
+          <NotificationInput
+            method={notificationMethod}
+            onMethodChange={setNotificationMethod}
+            email={notificationEmail}
+            onEmailChange={setNotificationEmail}
+            discordWebhook={notificationDiscordWebhook}
+            onDiscordWebhookChange={setNotificationDiscordWebhook}
           />
 
           <Button

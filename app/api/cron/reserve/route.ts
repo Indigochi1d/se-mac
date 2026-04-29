@@ -6,6 +6,7 @@ import { loginToPortal, loginToLibseat } from "@/lib/sejong/auth";
 import { submitReservation } from "@/lib/sejong/reserve";
 import { fetchReserveNo } from "@/lib/sejong/myseat";
 import { sendReservationEmail } from "@/lib/email";
+import { sendReservationDiscordNotification } from "@/lib/discord";
 
 /** 예약은 7일 전에 수행 (KST 기준 오늘 + 7일) */
 const TARGET_DATE_OFFSET = 7;
@@ -57,6 +58,7 @@ export async function GET(request: NextRequest) {
       hours,
       reason,
       notification_email,
+      notification_discord_webhook,
       reservation_credentials ( password ),
       companions ( student_id, name )
     `,
@@ -241,24 +243,35 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // 5e. 이메일 알림 발송
-    const email = studentReservations[0]?.notification_email;
-    if (email) {
-      const studentResults = results.filter((r) =>
-        studentReservations.some((sr) => sr.id === r.reservationId),
-      );
+    // 5e. 알림 발송
+    const firstReservation = studentReservations[0];
+    const studentResults = results.filter((r) =>
+      studentReservations.some((sr) => sr.id === r.reservationId),
+    );
+    const notificationResults = studentResults.map((r) => ({
+      date: studentReservations.find((sr) => sr.id === r.reservationId)!
+        .reservation_date,
+      status: r.status,
+      message: r.message,
+    }));
 
+    if (firstReservation?.notification_email) {
       await sendReservationEmail({
-        to: email,
-        roomId: studentReservations[0].room_id,
-        startTime: studentReservations[0].start_time,
-        hours: studentReservations[0].hours,
-        results: studentResults.map((r) => ({
-          date: studentReservations.find((sr) => sr.id === r.reservationId)!
-            .reservation_date,
-          status: r.status,
-          message: r.message,
-        })),
+        to: firstReservation.notification_email,
+        roomId: firstReservation.room_id,
+        startTime: firstReservation.start_time,
+        hours: firstReservation.hours,
+        results: notificationResults,
+      });
+    }
+
+    if (firstReservation?.notification_discord_webhook) {
+      await sendReservationDiscordNotification({
+        webhookUrl: firstReservation.notification_discord_webhook,
+        roomId: firstReservation.room_id,
+        startTime: firstReservation.start_time,
+        hours: firstReservation.hours,
+        results: notificationResults,
       });
     }
   }

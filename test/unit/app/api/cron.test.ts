@@ -63,6 +63,13 @@ jest.mock("@/lib/email", () => ({
   sendReservationEmail: (...args: unknown[]) => mockSendReservationEmail(...args),
 }));
 
+// lib/discord mock
+const mockSendReservationDiscordNotification = jest.fn();
+jest.mock("@/lib/discord", () => ({
+  sendReservationDiscordNotification: (...args: unknown[]) =>
+    mockSendReservationDiscordNotification(...args),
+}));
+
 import { NextRequest } from "next/server";
 import { GET } from "@/app/api/cron/reserve/route";
 
@@ -78,6 +85,7 @@ beforeEach(() => {
   mockSupabaseDelete.mockResolvedValue({ error: null });
   mockFetchReserveNo.mockResolvedValue("RES-001");
   mockSendReservationEmail.mockResolvedValue(undefined);
+  mockSendReservationDiscordNotification.mockResolvedValue(undefined);
 });
 
 describe("GET /api/cron/reserve - 인증", () => {
@@ -189,6 +197,7 @@ describe("GET /api/cron/reserve - DB 처리", () => {
       hours: 2,
       reason: "스터디",
       notification_email: "student@test.com",
+      notification_discord_webhook: null,
       reservation_credentials: [{ password: "encrypted-pw" }],
       companions: [],
     };
@@ -211,5 +220,68 @@ describe("GET /api/cron/reserve - DB 처리", () => {
     expect(mockSendReservationEmail).toHaveBeenCalledWith(
       expect.objectContaining({ to: "student@test.com" }),
     );
+  });
+
+  it("Discord 웹훅 있으면 sendReservationDiscordNotification 호출", async () => {
+    const webhookUrl = "https://discord.com/api/webhooks/1234567890/test-token";
+    const mockReservation = {
+      id: 4,
+      student_id: "20001234",
+      room_id: "4",
+      reservation_date: "2026-03-26",
+      start_time: "14:00",
+      hours: 2,
+      reason: "스터디",
+      notification_email: null,
+      notification_discord_webhook: webhookUrl,
+      reservation_credentials: [{ password: "encrypted-pw" }],
+      companions: [],
+    };
+    mockSupabaseSelect.mockResolvedValue({
+      data: [mockReservation],
+      error: null,
+    });
+    mockLoginToPortal.mockResolvedValue("sso-tok");
+    mockLoginToLibseat.mockResolvedValue({
+      phpSessId: "php-sess",
+      token: "tok",
+      studentName: "홍길동",
+    });
+    mockSubmitReservation.mockResolvedValue({ success: true, message: "완료" });
+
+    await GET(makeRequest("Bearer test-cron-secret"));
+    expect(mockSendReservationDiscordNotification).toHaveBeenCalledWith(
+      expect.objectContaining({ webhookUrl }),
+    );
+  });
+
+  it("Discord 웹훅 없으면 sendReservationDiscordNotification 호출 안 됨", async () => {
+    const mockReservation = {
+      id: 5,
+      student_id: "20001234",
+      room_id: "4",
+      reservation_date: "2026-03-26",
+      start_time: "14:00",
+      hours: 2,
+      reason: "스터디",
+      notification_email: null,
+      notification_discord_webhook: null,
+      reservation_credentials: [{ password: "encrypted-pw" }],
+      companions: [],
+    };
+    mockSupabaseSelect.mockResolvedValue({
+      data: [mockReservation],
+      error: null,
+    });
+    mockLoginToPortal.mockResolvedValue("sso-tok");
+    mockLoginToLibseat.mockResolvedValue({
+      phpSessId: "php-sess",
+      token: "tok",
+      studentName: "홍길동",
+    });
+    mockSubmitReservation.mockResolvedValue({ success: true, message: "완료" });
+
+    await GET(makeRequest("Bearer test-cron-secret"));
+    expect(mockSendReservationDiscordNotification).not.toHaveBeenCalled();
   });
 });
