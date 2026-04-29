@@ -419,7 +419,6 @@ export async function POST(request: NextRequest) {
         startTime,
         hours,
         results: immediateResults,
-        scheduledCount,
       });
     }
 
