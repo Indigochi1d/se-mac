@@ -14,7 +14,6 @@ interface SendReservationDiscordNotificationParams {
   startTime: string;
   hours: number;
   results: ReservationResult[];
-  scheduledCount?: number;
 }
 
 function resolveEmbedColor(results: ReservationResult[]): number {
@@ -51,26 +50,16 @@ function buildResultDetailField(results: ReservationResult[]) {
   };
 }
 
-function buildScheduledCountField(scheduledCount: number) {
-  return {
-    name: "자동 예약 대기",
-    value: `나머지 ${scheduledCount}건은 자동 예약 대기 중이며, 처리 후 별도로 안내됩니다.`,
-    inline: false,
-  };
-}
-
 function buildDiscordPayload({
   roomName,
   startTime,
   hours,
   results,
-  scheduledCount,
 }: {
   roomName: string;
   startTime: string;
   hours: number;
   results: ReservationResult[];
-  scheduledCount?: number;
 }) {
   const endTime = getEndTime(startTime, hours);
   const fields = [
@@ -83,10 +72,6 @@ function buildDiscordPayload({
     buildResultSummaryField(results),
     buildResultDetailField(results),
   ];
-
-  if (scheduledCount && scheduledCount > 0) {
-    fields.push(buildScheduledCountField(scheduledCount));
-  }
 
   return {
     embeds: [
@@ -103,8 +88,7 @@ function buildDiscordPayload({
 export async function sendReservationDiscordNotification(
   params: SendReservationDiscordNotificationParams,
 ): Promise<void> {
-  const { webhookUrl, roomId, startTime, hours, results, scheduledCount } =
-    params;
+  const { webhookUrl, roomId, startTime, hours, results } = params;
   const roomName =
     STUDY_ROOMS.find((room) => room.id === roomId)?.name ??
     `스터디룸 ${roomId}`;
@@ -114,7 +98,6 @@ export async function sendReservationDiscordNotification(
     startTime,
     hours,
     results,
-    scheduledCount,
   });
 
   try {

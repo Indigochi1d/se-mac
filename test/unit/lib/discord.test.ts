@@ -81,23 +81,6 @@ describe("sendReservationDiscordNotification", () => {
     expect(allFieldText).toContain("16:00");
   });
 
-  it("scheduledCount > 0이면 대기 안내 포함", async () => {
-    await sendReservationDiscordNotification({ ...baseParams, scheduledCount: 3 });
-    const [, options] = mockFetch.mock.calls[0];
-    const payload = JSON.parse(options.body);
-    const allText = JSON.stringify(payload.embeds[0]);
-    expect(allText).toContain("3");
-    expect(allText).toContain("자동 예약 대기");
-  });
-
-  it("scheduledCount 없으면 대기 안내 미포함", async () => {
-    await sendReservationDiscordNotification(baseParams);
-    const [, options] = mockFetch.mock.calls[0];
-    const payload = JSON.parse(options.body);
-    const allText = JSON.stringify(payload.embeds[0]);
-    expect(allText).not.toContain("자동 예약 대기");
-  });
-
   it("fetch 실패해도 에러를 throw하지 않음", async () => {
     mockFetch.mockRejectedValueOnce(new Error("Network error"));
     await expect(
