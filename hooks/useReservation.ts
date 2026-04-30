@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useReducer, useMemo } from "react";
 import { STUDY_ROOMS } from "@/constants/studyroom";
 import { generateRecurringDates, getNextWeekDate } from "@/lib/date";
 import type { Companion } from "@/components/reservation/CompanionInput";
@@ -14,43 +14,130 @@ interface SubmitResult {
   scheduledCount?: number;
 }
 
+type NotificationMethod = "none" | "email" | "discord";
+
+interface ReservationDraft {
+  studyRoomId: string;
+  selectedDay: string;
+  startDate: string;
+  startTime: string;
+  hours: number;
+  endDate: string;
+  companions: Companion[];
+  reason: string;
+  notificationMethod: NotificationMethod;
+  notificationEmail: string;
+  notificationDiscordWebhook: string;
+}
+
+type ReservationDraftAction =
+  | {
+      [K in keyof ReservationDraft]: {
+        type: "SET_FIELD";
+        field: K;
+        value: ReservationDraft[K];
+      };
+    }[keyof ReservationDraft]
+  | { type: "CHANGE_DAY"; day: string; startDate: string }
+  | { type: "RESET" };
+
+const initialReservationDraft: ReservationDraft = {
+  studyRoomId: "",
+  selectedDay: "",
+  startDate: "",
+  startTime: "",
+  hours: 1,
+  endDate: "",
+  companions: [],
+  reason: "",
+  notificationMethod: "none",
+  notificationEmail: "",
+  notificationDiscordWebhook: "",
+};
+
+function reservationDraftReducer(
+  state: ReservationDraft,
+  action: ReservationDraftAction,
+): ReservationDraft {
+  switch (action.type) {
+    case "SET_FIELD":
+      return { ...state, [action.field]: action.value };
+    case "CHANGE_DAY":
+      return {
+        ...state,
+        selectedDay: action.day,
+        startDate: action.startDate,
+        endDate: "",
+      };
+    case "RESET":
+      return initialReservationDraft;
+  }
+}
+
 export const useReservation = () => {
-  const [studyRoomId, setStudyRoomId] = useState("");
-  const [selectedDay, setSelectedDay] = useState("");
-  const [startDate, setStartDate] = useState("");
-  const [startTime, setStartTime] = useState("");
-  const [hours, setHours] = useState(1);
-  const [endDate, setEndDate] = useState("");
-  const [companions, setCompanions] = useState<Companion[]>([]);
-  const [reason, setReason] = useState("");
-  const [notificationMethod, setNotificationMethod] = useState<"none" | "email" | "discord">("none");
-  const [notificationEmail, setNotificationEmail] = useState("");
-  const [notificationDiscordWebhook, setNotificationDiscordWebhook] = useState("");
+  const [draft, dispatch] = useReducer(
+    reservationDraftReducer,
+    initialReservationDraft,
+  );
   const [occupiedSlots, setOccupiedSlots] = useState<string[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitResult, setSubmitResult] = useState<SubmitResult | null>(null);
 
+  const {
+    studyRoomId,
+    selectedDay,
+    startDate,
+    startTime,
+    hours,
+    endDate,
+    companions,
+    reason,
+    notificationMethod,
+    notificationEmail,
+    notificationDiscordWebhook,
+  } = draft;
+
   const selectedRoom = STUDY_ROOMS.find((room) => room.id === studyRoomId);
 
+  const draftFieldUpdaters = useMemo(
+    () => ({
+      setStudyRoomId: (value: string) =>
+        dispatch({ type: "SET_FIELD", field: "studyRoomId", value }),
+      setSelectedDay: (value: string) =>
+        dispatch({ type: "SET_FIELD", field: "selectedDay", value }),
+      setStartDate: (value: string) =>
+        dispatch({ type: "SET_FIELD", field: "startDate", value }),
+      setStartTime: (value: string) =>
+        dispatch({ type: "SET_FIELD", field: "startTime", value }),
+      setHours: (value: number) =>
+        dispatch({ type: "SET_FIELD", field: "hours", value }),
+      setEndDate: (value: string) =>
+        dispatch({ type: "SET_FIELD", field: "endDate", value }),
+      setCompanions: (value: Companion[]) =>
+        dispatch({ type: "SET_FIELD", field: "companions", value }),
+      setReason: (value: string) =>
+        dispatch({ type: "SET_FIELD", field: "reason", value }),
+      setNotificationMethod: (value: NotificationMethod) =>
+        dispatch({ type: "SET_FIELD", field: "notificationMethod", value }),
+      setNotificationEmail: (value: string) =>
+        dispatch({ type: "SET_FIELD", field: "notificationEmail", value }),
+      setNotificationDiscordWebhook: (value: string) =>
+        dispatch({
+          type: "SET_FIELD",
+          field: "notificationDiscordWebhook",
+          value,
+        }),
+    }),
+    [],
+  );
+
   const handleDayChange = (day: string) => {
-    setSelectedDay(day);
     const { year, month, day: d } = getNextWeekDate(day);
-    setStartDate(`${year}-${month}-${d}`);
-    setEndDate("");
+    dispatch({ type: "CHANGE_DAY", day, startDate: `${year}-${month}-${d}` });
   };
 
   const handleResetForm = () => {
-    setStudyRoomId("");
-    setSelectedDay("");
-    setStartDate("");
-    setStartTime("");
-    setHours(1);
-    setEndDate("");
-    setCompanions([]);
-    setReason("");
-    setNotificationMethod("none");
-    setNotificationEmail("");
-    setNotificationDiscordWebhook("");
+    dispatch({ type: "RESET" });
     setOccupiedSlots([]);
     setSubmitResult(null);
   };
@@ -125,8 +212,14 @@ export const useReservation = () => {
           companions,
           reason,
           endDate,
-          notificationEmail: notificationMethod === "email" ? notificationEmail.trim() || undefined : undefined,
-          notificationDiscordWebhook: notificationMethod === "discord" ? notificationDiscordWebhook.trim() || undefined : undefined,
+          notificationEmail:
+            notificationMethod === "email"
+              ? notificationEmail.trim() || undefined
+              : undefined,
+          notificationDiscordWebhook:
+            notificationMethod === "discord"
+              ? notificationDiscordWebhook.trim() || undefined
+              : undefined,
         }),
       });
 
@@ -169,28 +262,18 @@ export const useReservation = () => {
 
   return {
     studyRoomId,
-    setStudyRoomId,
     selectedDay,
-    setSelectedDay,
-    handleDayChange,
     startDate,
-    setStartDate,
     startTime,
-    setStartTime,
     hours,
-    setHours,
     endDate,
-    setEndDate,
     companions,
-    setCompanions,
     reason,
-    setReason,
     notificationMethod,
-    setNotificationMethod,
     notificationEmail,
-    setNotificationEmail,
     notificationDiscordWebhook,
-    setNotificationDiscordWebhook,
+    ...draftFieldUpdaters,
+    handleDayChange,
     selectedRoom,
     occupiedSlots,
     isSubmitting,

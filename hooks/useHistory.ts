@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useReducer, useState } from "react";
 import { isFutureReservation, isMoreThanOneDayPast } from "@/lib/date";
 
 export interface Reservation {
@@ -38,20 +38,75 @@ export interface DetailModalTarget {
 
 export type EditProgressStep = "idle" | "cancelling" | "reserving" | "done";
 
+interface DetailViewState {
+  target: DetailModalTarget | null;
+  detail: ReservationDetail | null;
+  isLoadingDetail: boolean;
+  isEditSaving: boolean;
+  editProgressStep: EditProgressStep;
+}
+
+type DetailViewAction =
+  | { type: "OPEN"; target: DetailModalTarget }
+  | { type: "FINISH_LOADING"; detail: ReservationDetail | null }
+  | { type: "CLOSE" }
+  | { type: "BEGIN_SAVE"; initialStep: EditProgressStep }
+  | { type: "ADVANCE_SAVE_STEP"; step: EditProgressStep }
+  | { type: "ABORT_SAVE" };
+
+const initialDetailViewState: DetailViewState = {
+  target: null,
+  detail: null,
+  isLoadingDetail: false,
+  isEditSaving: false,
+  editProgressStep: "idle",
+};
+
+function detailViewReducer(
+  state: DetailViewState,
+  action: DetailViewAction,
+): DetailViewState {
+  switch (action.type) {
+    case "OPEN":
+      return {
+        ...initialDetailViewState,
+        target: action.target,
+        isLoadingDetail: true,
+      };
+    case "FINISH_LOADING":
+      return { ...state, detail: action.detail, isLoadingDetail: false };
+    case "CLOSE":
+      return initialDetailViewState;
+    case "BEGIN_SAVE":
+      return {
+        ...state,
+        isEditSaving: true,
+        editProgressStep: action.initialStep,
+      };
+    case "ADVANCE_SAVE_STEP":
+      return { ...state, editProgressStep: action.step };
+    case "ABORT_SAVE":
+      return { ...state, isEditSaving: false, editProgressStep: "idle" };
+  }
+}
+
 export const useHistory = () => {
   const [groups, setGroups] = useState<ReservationGroup[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [cancellingId, setCancellingId] = useState<number | null>(null);
   const [cancelTarget, setCancelTarget] = useState<CancelTarget | null>(null);
 
-  const [detailModalTarget, setDetailModalTarget] =
-    useState<DetailModalTarget | null>(null);
-  const [reservationDetail, setReservationDetail] =
-    useState<ReservationDetail | null>(null);
-  const [isLoadingDetail, setIsLoadingDetail] = useState(false);
-  const [isEditSaving, setIsEditSaving] = useState(false);
-  const [editProgressStep, setEditProgressStep] =
-    useState<EditProgressStep>("idle");
+  const [detailView, dispatchDetailView] = useReducer(
+    detailViewReducer,
+    initialDetailViewState,
+  );
+  const {
+    target: detailModalTarget,
+    detail: reservationDetail,
+    isLoadingDetail,
+    isEditSaving,
+    editProgressStep,
+  } = detailView;
 
   const fetchHistory = async () => {
     try {
@@ -120,29 +175,24 @@ export const useHistory = () => {
     reservation: Reservation,
     group: ReservationGroup,
   ) => {
-    setDetailModalTarget({ reservation, group });
-    setIsLoadingDetail(true);
-    setReservationDetail(null);
+    dispatchDetailView({ type: "OPEN", target: { reservation, group } });
 
     try {
       const response = await fetch(`/api/reservations/${reservation.id}`);
       const data = await response.json();
-      if (data.success) {
-        setReservationDetail(data.data);
-      }
+      dispatchDetailView({
+        type: "FINISH_LOADING",
+        detail: data.success ? data.data : null,
+      });
     } catch (error) {
       console.error("예약 상세 조회 실패:", error);
-    } finally {
-      setIsLoadingDetail(false);
+      dispatchDetailView({ type: "FINISH_LOADING", detail: null });
     }
   };
 
   const closeDetailModal = () => {
     if (isEditSaving) return;
-    setDetailModalTarget(null);
-    setReservationDetail(null);
-    setIsLoadingDetail(false);
-    setEditProgressStep("idle");
+    dispatchDetailView({ type: "CLOSE" });
   };
 
   const saveEditedCompanions = async (
@@ -156,14 +206,17 @@ export const useHistory = () => {
       reservation.bookingId !== null &&
       isFutureReservation(reservation.date, group.startTime);
 
-    setIsEditSaving(true);
+    dispatchDetailView({
+      type: "BEGIN_SAVE",
+      initialStep: isLibraryBookedAndFuture ? "cancelling" : "idle",
+    });
 
     let stepTransitionTimer: ReturnType<typeof setTimeout> | null = null;
 
     if (isLibraryBookedAndFuture) {
-      setEditProgressStep("cancelling");
       stepTransitionTimer = setTimeout(
-        () => setEditProgressStep("reserving"),
+        () =>
+          dispatchDetailView({ type: "ADVANCE_SAVE_STEP", step: "reserving" }),
         2500,
       );
     }
@@ -180,24 +233,19 @@ export const useHistory = () => {
       const data = await response.json();
 
       if (data.success) {
-        setEditProgressStep("done");
+        dispatchDetailView({ type: "ADVANCE_SAVE_STEP", step: "done" });
         await fetchHistory();
         setTimeout(() => {
-          setDetailModalTarget(null);
-          setReservationDetail(null);
-          setIsEditSaving(false);
-          setEditProgressStep("idle");
+          dispatchDetailView({ type: "CLOSE" });
         }, 1500);
       } else {
         alert(data.message);
-        setIsEditSaving(false);
-        setEditProgressStep("idle");
+        dispatchDetailView({ type: "ABORT_SAVE" });
       }
     } catch {
       if (stepTransitionTimer) clearTimeout(stepTransitionTimer);
       alert("예약 수정 중 오류가 발생했습니다.");
-      setIsEditSaving(false);
-      setEditProgressStep("idle");
+      dispatchDetailView({ type: "ABORT_SAVE" });
     }
   };
 
