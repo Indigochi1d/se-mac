@@ -92,7 +92,7 @@ export const ScheduleSelect = ({
     [selectedDay, endDate, onStartDateChange, onEndDateChange],
   );
 
-  const beforeSelectStartEndDay = startDate === "" || endDate === "";
+  const isDateRangeIncomplete = startDate === "" || endDate === "";
 
   return (
     <div className="space-y-4">
@@ -144,12 +144,19 @@ export const ScheduleSelect = ({
 
       <div className="space-y-2">
         <Label>이용시간</Label>
-        <p className="text-sm text-muted-foreground">
-          반복 예약의 시작일과 종료일을 선택하면 이용 시간을 설정할 수 있어요
-        </p>
+        {isDateRangeIncomplete ? (
+          <p className="text-sm text-muted-foreground">
+            반복 예약의 시작일과 종료일을 선택하면 이용 시간을 설정할 수 있어요
+          </p>
+        ) : (
+          <p className="text-sm text-muted-foreground">
+            하루 최대 2시간까지 이용할 수 있어요
+          </p>
+        )}
+
         <div className="flex gap-2 flex-wrap">
           {TIME_SLOTS.map((time) => {
-            const disabled = occupiedSet.has(time) || beforeSelectStartEndDay;
+            const disabled = occupiedSet.has(time) || isDateRangeIncomplete;
             const selected = startTime === time;
             return (
               <Button
