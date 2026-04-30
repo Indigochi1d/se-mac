@@ -1,11 +1,13 @@
 "use client";
 
 import { useMemo, useCallback } from "react";
+import { Loader2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { getNextWeekDate } from "@/lib/date";
+import { cn } from "@/lib/utils";
 import { DAYS, TIME_SLOTS } from "@/constants/schedule";
 
 interface ScheduleSelectProps {
@@ -20,6 +22,7 @@ interface ScheduleSelectProps {
   endDate: string;
   onEndDateChange: (date: string) => void;
   occupiedSlots: string[];
+  isLoadingSlots: boolean;
 }
 
 const DAY_JS_MAP: Record<string, number> = {
@@ -44,6 +47,7 @@ export const ScheduleSelect = ({
   endDate,
   onEndDateChange,
   occupiedSlots,
+  isLoadingSlots,
 }: ScheduleSelectProps) => {
   const occupiedSet = useMemo(() => new Set(occupiedSlots), [occupiedSlots]);
 
@@ -154,22 +158,34 @@ export const ScheduleSelect = ({
           </p>
         )}
 
-        <div className="flex gap-2 flex-wrap">
-          {TIME_SLOTS.map((time) => {
-            const disabled = occupiedSet.has(time) || isDateRangeIncomplete;
-            const selected = startTime === time;
-            return (
-              <Button
-                key={time}
-                type="button"
-                variant={selected ? "default" : "outline"}
-                disabled={disabled}
-                onClick={() => handleTimeClick(time)}
-              >
-                {parseInt(time)}시
-              </Button>
-            );
-          })}
+        <div className="relative">
+          <div
+            className={cn(
+              "flex gap-2 flex-wrap transition-opacity",
+              isLoadingSlots && "opacity-50 pointer-events-none",
+            )}
+          >
+            {TIME_SLOTS.map((time) => {
+              const disabled = occupiedSet.has(time) || isDateRangeIncomplete;
+              const selected = startTime === time;
+              return (
+                <Button
+                  key={time}
+                  type="button"
+                  variant={selected ? "default" : "outline"}
+                  disabled={disabled}
+                  onClick={() => handleTimeClick(time)}
+                >
+                  {parseInt(time)}시
+                </Button>
+              );
+            })}
+          </div>
+          {isLoadingSlots && (
+            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+              <Loader2 className="size-6 animate-spin text-gray-500" />
+            </div>
+          )}
         </div>
         <div className="flex gap-2">
           <Button

@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -23,14 +24,27 @@ export const ReservationHistoryButton = () => {
 
 export const LogoutButton = () => {
   const router = useRouter();
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   const handleLogout = async () => {
-    await fetch("/api/auth/logout", { method: "POST" });
-    router.push("/login");
+    if (isLoggingOut) return;
+    setIsLoggingOut(true);
+    try {
+      await fetch("/api/auth/logout", { method: "POST" });
+      router.push("/login");
+    } catch {
+      setIsLoggingOut(false);
+    }
   };
 
   return (
-    <Button variant="ghost" size="sm" onClick={handleLogout}>
+    <Button
+      variant="ghost"
+      size="sm"
+      onClick={handleLogout}
+      loading={isLoggingOut}
+      loadingText="로그아웃 중..."
+    >
       <LogOut className="size-4" />
       로그아웃
     </Button>

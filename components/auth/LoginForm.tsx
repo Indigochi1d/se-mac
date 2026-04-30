@@ -104,10 +104,11 @@ export function LoginForm({
               <Field className="pt-2">
                 <Button
                   type="submit"
-                  disabled={isLoading}
+                  loading={isLoading}
+                  loadingText="로그인 중..."
                   className="w-full h-11 bg-linear-to-r from-red-700 to-red-800 hover:from-red-800 hover:to-red-900 text-white font-semibold shadow-md transition-all duration-200 disabled:opacity-50"
                 >
-                  {isLoading ? "로그인 중..." : "로그인"}
+                  로그인
                 </Button>
               </Field>
             </FieldGroup>

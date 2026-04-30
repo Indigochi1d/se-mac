@@ -80,6 +80,7 @@ export const useReservation = () => {
     initialReservationDraft,
   );
   const [occupiedSlots, setOccupiedSlots] = useState<string[]>([]);
+  const [isLoadingSlots, setIsLoadingSlots] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitResult, setSubmitResult] = useState<SubmitResult | null>(null);
 
@@ -146,19 +147,25 @@ export const useReservation = () => {
   useEffect(() => {
     if (!studyRoomId || !selectedDay || !startDate || !endDate) {
       setOccupiedSlots([]);
+      setIsLoadingSlots(false);
       return;
     }
 
     const dates = generateRecurringDates(selectedDay, endDate, startDate);
     if (dates.length === 0) {
       setOccupiedSlots([]);
+      setIsLoadingSlots(false);
       return;
     }
 
-    const fetchSlots = async () => {
+    const controller = new AbortController();
+    setIsLoadingSlots(true);
+
+    const debounceTimer = setTimeout(async () => {
       try {
         const res = await fetch(
           `/api/reservations/slots?roomId=${studyRoomId}&dates=${dates.join(",")}`,
+          { signal: controller.signal },
         );
         const json = await res.json();
         if (json.success) {
@@ -167,12 +174,18 @@ export const useReservation = () => {
           ]);
         }
       } catch (error) {
+        if ((error as Error).name === "AbortError") return;
         console.error("점유 슬롯 조회 실패:", error);
         setOccupiedSlots([]);
+      } finally {
+        if (!controller.signal.aborted) setIsLoadingSlots(false);
       }
-    };
+    }, 250);
 
-    fetchSlots();
+    return () => {
+      clearTimeout(debounceTimer);
+      controller.abort();
+    };
   }, [studyRoomId, selectedDay, startDate, endDate]);
 
   // 유효성 검사
@@ -276,6 +289,7 @@ export const useReservation = () => {
     handleDayChange,
     selectedRoom,
     occupiedSlots,
+    isLoadingSlots,
     isSubmitting,
     submitResult,
     setSubmitResult,

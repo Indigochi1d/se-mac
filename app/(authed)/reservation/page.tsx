@@ -48,6 +48,7 @@ const ReservationPage = () => {
     setNotificationDiscordWebhook,
     selectedRoom,
     occupiedSlots,
+    isLoadingSlots,
     isSubmitting,
     submitResult,
     setSubmitResult,
@@ -88,6 +89,7 @@ const ReservationPage = () => {
             endDate={endDate}
             onEndDateChange={setEndDate}
             occupiedSlots={occupiedSlots}
+            isLoadingSlots={isLoadingSlots}
           />
 
           <Separator />
@@ -116,9 +118,11 @@ const ReservationPage = () => {
             className="w-full"
             size="xl"
             onClick={handleSubmit}
-            disabled={!isValid || isSubmitting}
+            disabled={!isValid}
+            loading={isSubmitting}
+            loadingText="예약 등록 중..."
           >
-            {isSubmitting ? "예약 등록 중..." : "반복 예약 등록하기"}
+            반복 예약 등록하기
           </Button>
         </CardContent>
       </Card>
