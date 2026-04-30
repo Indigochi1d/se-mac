@@ -92,6 +92,8 @@ export const ScheduleSelect = ({
     [selectedDay, endDate, onStartDateChange, onEndDateChange],
   );
 
+  const beforeSelectStartEndDay = startDate === "" || endDate === "";
+
   return (
     <div className="space-y-4">
       <div className="space-y-2">
@@ -113,13 +115,41 @@ export const ScheduleSelect = ({
       </div>
 
       <div className="space-y-2">
+        <Label>반복 예약 시작 날짜</Label>
+        <Input
+          type="date"
+          value={startDate}
+          onChange={(e) => handleStartDateChange(e.target.value)}
+          min={minStartDate}
+          disabled={!selectedDay}
+        />
+        <p className="text-sm text-muted-foreground">
+          선택한 요일에 해당하는 날짜만 선택할 수 있어요
+        </p>
+      </div>
+
+      <div className="space-y-2">
+        <Label>반복 예약 종료 날짜</Label>
+        <Input
+          type="date"
+          value={endDate}
+          onChange={(e) => onEndDateChange(e.target.value)}
+          min={minEndDate}
+          disabled={!selectedDay}
+        />
+        <p className="text-sm text-muted-foreground">
+          이 날짜까지 매주 반복 예약돼요
+        </p>
+      </div>
+
+      <div className="space-y-2">
         <Label>이용시간</Label>
         <p className="text-sm text-muted-foreground">
-          하루 최대 2시간까지 이용할 수 있어요
+          반복 예약의 시작일과 종료일을 선택하면 이용 시간을 설정할 수 있어요
         </p>
         <div className="flex gap-2 flex-wrap">
           {TIME_SLOTS.map((time) => {
-            const disabled = occupiedSet.has(time);
+            const disabled = occupiedSet.has(time) || beforeSelectStartEndDay;
             const selected = startTime === time;
             return (
               <Button
@@ -151,33 +181,6 @@ export const ScheduleSelect = ({
             2시간
           </Button>
         </div>
-      </div>
-      <div className="space-y-2">
-        <Label>반복 예약 시작 날짜</Label>
-        <Input
-          type="date"
-          value={startDate}
-          onChange={(e) => handleStartDateChange(e.target.value)}
-          min={minStartDate}
-          disabled={!selectedDay}
-        />
-        <p className="text-sm text-muted-foreground">
-          선택한 요일에 해당하는 날짜만 선택할 수 있어요.
-        </p>
-      </div>
-
-      <div className="space-y-2">
-        <Label>반복 예약 종료 날짜</Label>
-        <Input
-          type="date"
-          value={endDate}
-          onChange={(e) => onEndDateChange(e.target.value)}
-          min={minEndDate}
-          disabled={!selectedDay}
-        />
-        <p className="text-sm text-muted-foreground">
-          이 날짜까지 매주 반복 예약됩니다.
-        </p>
       </div>
     </div>
   );
