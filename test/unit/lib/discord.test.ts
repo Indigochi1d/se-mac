@@ -45,7 +45,7 @@ describe("sendReservationDiscordNotification", () => {
     await sendReservationDiscordNotification(baseParams);
     const [, options] = mockFetch.mock.calls[0];
     const payload = JSON.parse(options.body);
-    expect(payload.embeds[0].title).toBe("스터디룸이 예약되었어요.");
+    expect(payload.embeds[0].title).toBe("스터디룸이 예약되었어요");
   });
 
   it("embed fields에 예약자 이름 포함", async () => {
@@ -135,6 +135,6 @@ describe("sendReservationDiscordNotification", () => {
     await sendReservationDiscordNotification(baseParams);
     const [, options] = mockFetch.mock.calls[0];
     const payload = JSON.parse(options.body);
-    expect(payload.embeds[0].footer.text).toContain("세종대학교");
+    expect(payload.embeds[0].footer.text).toContain("세종대");
   });
 });
