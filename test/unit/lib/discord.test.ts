@@ -1,17 +1,24 @@
+import { sendReservationDiscordNotification } from "@/lib/discord";
+
 const mockFetch = jest.fn();
 global.fetch = mockFetch;
 
-import { sendReservationDiscordNotification } from "@/lib/discord";
-
 const baseParams = {
-  webhookUrl: "https://discord.com/api/webhooks/1234567890/test-token",
+  webhookUrl:
+    "https://discord.com/api/webhooks/1498914916445458462/C1bR598ZGd1kYVraVbi7UtuicV8japs3BsC6IpgXQhR2aOOWRddzodsiYfqzpVNYxsrz",
   roomId: "4",
   startTime: "14:00",
   hours: 2,
   results: [
     { date: "2026-03-19", status: "success" as const, message: "예약 완료" },
-    { date: "2026-03-26", status: "failed" as const, message: "이미 예약된 시간" },
+    {
+      date: "2026-03-26",
+      status: "failed" as const,
+      message: "이미 예약된 시간",
+    },
   ],
+  userName: "홍길동",
+  reason: "스터디 발표 준비",
 };
 
 beforeEach(() => {
@@ -34,11 +41,43 @@ describe("sendReservationDiscordNotification", () => {
     expect(options.headers["Content-Type"]).toBe("application/json");
   });
 
-  it("embed title에 '스터디룸 예약 결과' 포함", async () => {
+  it("embed title이 '스터디룸이 예약되었어요.'", async () => {
     await sendReservationDiscordNotification(baseParams);
     const [, options] = mockFetch.mock.calls[0];
     const payload = JSON.parse(options.body);
-    expect(payload.embeds[0].title).toContain("스터디룸 예약 결과");
+    expect(payload.embeds[0].title).toBe("스터디룸이 예약되었어요.");
+  });
+
+  it("embed fields에 예약자 이름 포함", async () => {
+    await sendReservationDiscordNotification(baseParams);
+    const [, options] = mockFetch.mock.calls[0];
+    const payload = JSON.parse(options.body);
+    const fieldValues = payload.embeds[0].fields.map(
+      (f: { value: string }) => f.value,
+    );
+    expect(fieldValues.some((v: string) => v.includes("홍길동"))).toBe(true);
+  });
+
+  it("예약 사유가 8자 초과면 스포일러 태그로 감쌈", async () => {
+    const longReasonParams = { ...baseParams, reason: "스터디 발표 준비 자료" };
+    await sendReservationDiscordNotification(longReasonParams);
+    const [, options] = mockFetch.mock.calls[0];
+    const payload = JSON.parse(options.body);
+    const reasonField = payload.embeds[0].fields.find(
+      (f: { name: string }) => f.name === "예약 사유",
+    );
+    expect(reasonField.value).toBe("스터디 발표 준||비 자료||");
+  });
+
+  it("예약 사유가 8자 이하면 그대로 표시", async () => {
+    const shortReasonParams = { ...baseParams, reason: "팀프로젝트" };
+    await sendReservationDiscordNotification(shortReasonParams);
+    const [, options] = mockFetch.mock.calls[0];
+    const payload = JSON.parse(options.body);
+    const reasonField = payload.embeds[0].fields.find(
+      (f: { name: string }) => f.name === "예약 사유",
+    );
+    expect(reasonField.value).toBe("팀프로젝트");
   });
 
   it("성공 결과가 있으면 embed color가 초록(0x16a34a)", async () => {
@@ -68,8 +107,12 @@ describe("sendReservationDiscordNotification", () => {
     const fieldValues = payload.embeds[0].fields.map(
       (field: { value: string }) => field.value,
     );
-    expect(fieldValues.some((value: string) => value.includes("성공"))).toBe(true);
-    expect(fieldValues.some((value: string) => value.includes("실패"))).toBe(true);
+    expect(fieldValues.some((value: string) => value.includes("성공"))).toBe(
+      true,
+    );
+    expect(fieldValues.some((value: string) => value.includes("실패"))).toBe(
+      true,
+    );
   });
 
   it("embed fields에 시작 시간과 종료 시간 포함", async () => {

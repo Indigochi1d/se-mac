@@ -269,6 +269,8 @@ export async function POST(request: NextRequest) {
     );
     const failedImmediateDates = new Set<string>();
 
+    let userName = "";
+
     if (submittableDates.length > 0) {
       Sentry.addBreadcrumb({
         message: "즉시 예약 시도",
@@ -277,6 +279,7 @@ export async function POST(request: NextRequest) {
       try {
         const session = await loginToLibseat(ssotoken);
         if (!session) throw new Error("도서관 로그인 실패");
+        userName = session.studentName;
 
         for (const date of submittableDates) {
           const reservationId = reservationMap.get(date)!;
@@ -419,6 +422,8 @@ export async function POST(request: NextRequest) {
         startTime,
         hours,
         results: immediateResults,
+        userName,
+        reason,
       });
     }
 

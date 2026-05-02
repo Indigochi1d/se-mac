@@ -272,6 +272,8 @@ export async function GET(request: NextRequest) {
         startTime: firstReservation.start_time,
         hours: firstReservation.hours,
         results: notificationResults,
+        userName: libseatSession.studentName,
+        reason: firstReservation.reason,
       });
     }
   }

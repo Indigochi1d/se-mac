@@ -14,6 +14,13 @@ interface SendReservationDiscordNotificationParams {
   startTime: string;
   hours: number;
   results: ReservationResult[];
+  userName: string;
+  reason: string;
+}
+
+function truncateReason(reason: string): string {
+  if (reason.length <= 8) return reason;
+  return reason.slice(0, 8) + "||" + reason.slice(8) + "||";
 }
 
 function resolveEmbedColor(results: ReservationResult[]): number {
@@ -55,11 +62,15 @@ function buildDiscordPayload({
   startTime,
   hours,
   results,
+  userName,
+  reason,
 }: {
   roomName: string;
   startTime: string;
   hours: number;
   results: ReservationResult[];
+  userName: string;
+  reason: string;
 }) {
   const endTime = getEndTime(startTime, hours);
   const fields = [
@@ -69,6 +80,8 @@ function buildDiscordPayload({
       value: `${startTime} ~ ${endTime} (${hours}시간)`,
       inline: true,
     },
+    { name: "예약자", value: userName, inline: true },
+    { name: "예약 사유", value: truncateReason(reason), inline: false },
     buildResultSummaryField(results),
     buildResultDetailField(results),
   ];
@@ -76,10 +89,10 @@ function buildDiscordPayload({
   return {
     embeds: [
       {
-        title: "스터디룸 예약 결과",
+        title: "스터디룸이 예약되었어요",
         color: resolveEmbedColor(results),
         fields,
-        footer: { text: "세종대학교 스터디룸 반복 예약 시스템" },
+        footer: { text: "se-mac: 세종대 스터디룸 반복 예약 시스템" },
       },
     ],
   };
@@ -88,7 +101,8 @@ function buildDiscordPayload({
 export async function sendReservationDiscordNotification(
   params: SendReservationDiscordNotificationParams,
 ): Promise<void> {
-  const { webhookUrl, roomId, startTime, hours, results } = params;
+  const { webhookUrl, roomId, startTime, hours, results, userName, reason } =
+    params;
   const roomName =
     STUDY_ROOMS.find((room) => room.id === roomId)?.name ??
     `스터디룸 ${roomId}`;
@@ -98,6 +112,8 @@ export async function sendReservationDiscordNotification(
     startTime,
     hours,
     results,
+    userName,
+    reason,
   });
 
   try {
