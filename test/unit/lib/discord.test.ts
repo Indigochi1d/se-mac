@@ -4,8 +4,7 @@ const mockFetch = jest.fn();
 global.fetch = mockFetch;
 
 const baseParams = {
-  webhookUrl:
-    "https://discord.com/api/webhooks/1498914916445458462/C1bR598ZGd1kYVraVbi7UtuicV8japs3BsC6IpgXQhR2aOOWRddzodsiYfqzpVNYxsrz",
+  webhookUrl: "https://discord.com/api/webhooks/1234567890/test-token",
   roomId: "4",
   startTime: "14:00",
   hours: 2,
