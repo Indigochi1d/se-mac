@@ -1,4 +1,4 @@
-import { sendReservationDiscordNotification } from "@/lib/discord";
+import { sendReservationDiscordNotification } from "../../../lib/discord";
 
 const mockFetch = jest.fn();
 global.fetch = mockFetch;
