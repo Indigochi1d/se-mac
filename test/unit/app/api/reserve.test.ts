@@ -265,6 +265,31 @@ describe("POST /api/reservations/reserve - 슬롯 충돌", () => {
     expect(successDates).toContain("2026-04-02");
   });
 
+  it("예약일이 정확히 7일 뒤(경계값)이면 즉시 예약 대상에 포함됨", async () => {
+    // KST 화요일 17:00 → 오늘 00:00 KST에 이미 크론이 7일 뒤 날짜를 처리했으므로,
+    // 같은 날 뒤늦게 추가된 예약은 즉시 처리해야 함
+    makeDbChain();
+    // 2026-03-24 08:00 UTC = 2026-03-24 17:00 KST (화)
+    jest.setSystemTime(new Date("2026-03-24T08:00:00Z"));
+    (generateRecurringDates as jest.Mock).mockReturnValueOnce(["2026-03-31"]);
+
+    const res = await POST(makeRequest(validBody));
+    expect(res.status).toBe(200);
+    expect(mockGetUnavailableTimes).toHaveBeenCalledWith("4", "20260331");
+    expect(mockSubmitReservation).toHaveBeenCalledTimes(1);
+  });
+
+  it("예약일이 8일 뒤이면 scheduled로 분류되어 즉시 예약 대상에서 제외", async () => {
+    makeDbChain();
+    jest.setSystemTime(new Date("2026-03-24T08:00:00Z"));
+    (generateRecurringDates as jest.Mock).mockReturnValueOnce(["2026-04-01"]);
+
+    const res = await POST(makeRequest(validBody));
+    expect(res.status).toBe(200);
+    expect(mockGetUnavailableTimes).not.toHaveBeenCalled();
+    expect(mockSubmitReservation).not.toHaveBeenCalled();
+  });
+
   it("가용성 체크 중 예외 발생 시 500 반환", async () => {
     makeDbChain();
     mockGetUnavailableTimes.mockRejectedValue(new Error("libseat 응답 오류"));
