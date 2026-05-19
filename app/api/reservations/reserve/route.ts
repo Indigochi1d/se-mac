@@ -144,7 +144,7 @@ export async function POST(request: NextRequest) {
     schedulableFrom.setDate(schedulableFrom.getDate() + CRON_LEAD_DAYS);
 
     const immediateDates = new Set(
-      dates.filter((date) => new Date(date) < schedulableFrom),
+      dates.filter((date) => new Date(date) <= schedulableFrom),
     );
 
     // 5. group_id 생성
