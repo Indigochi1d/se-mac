@@ -135,17 +135,20 @@ export async function POST(request: NextRequest) {
     // 예약일이 7일 이내이면 크론 실행 시점이 이미 지났으므로 즉시 예약이 필요하다.
     const CRON_LEAD_DAYS = 7;
 
-    const today = new Date(
-      new Date().toLocaleString("en-US", { timeZone: "Asia/Seoul" }),
-    );
-    today.setHours(0, 0, 0, 0);
+    const kstParts = new Intl.DateTimeFormat("en-CA", {
+      timeZone: "Asia/Seoul",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).formatToParts(new Date());
+    const y = kstParts.find((p) => p.type === "year")!.value;
+    const m = kstParts.find((p) => p.type === "month")!.value;
+    const d = kstParts.find((p) => p.type === "day")!.value;
+    const cutoffDate = new Date(Date.UTC(+y, +m - 1, +d));
+    cutoffDate.setUTCDate(cutoffDate.getUTCDate() + CRON_LEAD_DAYS);
+    const cutoff = cutoffDate.toISOString().slice(0, 10);
 
-    const schedulableFrom = new Date(today);
-    schedulableFrom.setDate(schedulableFrom.getDate() + CRON_LEAD_DAYS);
-
-    const immediateDates = new Set(
-      dates.filter((date) => new Date(date) <= schedulableFrom),
-    );
+    const immediateDates = new Set(dates.filter((date) => date <= cutoff));
 
     // 5. group_id 생성
     const groupId = randomUUID();
