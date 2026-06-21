@@ -30,4 +30,4 @@ const SEMESTER_TIME_SLOTS = [
 ];
 
 // 학기 ↔ 방학 전환 시 이 한 줄만 변경
-export const TIME_SLOTS = SEMESTER_TIME_SLOTS;
+export const TIME_SLOTS = VACATION_TIME_SLOTS;
