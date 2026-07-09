@@ -2,7 +2,8 @@
 const mockSupabaseSelect = jest.fn();
 const mockSupabaseUpdate = jest.fn();
 const mockSupabaseDelete = jest.fn();
-const mockSupabaseEq = jest.fn();
+// update 페이로드 검증용 (스키마에 없는 컬럼 전송 여부 등)
+const mockReservationUpdate = jest.fn(() => ({ eq: mockSupabaseUpdate }));
 
 jest.mock("@/lib/db", () => ({
   __esModule: true,
@@ -15,9 +16,7 @@ jest.mock("@/lib/db", () => ({
               eq: mockSupabaseSelect,
             })),
           })),
-          update: jest.fn(() => ({
-            eq: mockSupabaseUpdate,
-          })),
+          update: mockReservationUpdate,
         };
       }
       if (table === "reserved_slots") {
@@ -29,6 +28,15 @@ jest.mock("@/lib/db", () => ({
       }
     }),
   },
+}));
+
+// Sentry mock
+const mockCaptureException = jest.fn();
+const mockCaptureEvent = jest.fn();
+jest.mock("@sentry/nextjs", () => ({
+  captureCheckIn: jest.fn(() => "check-in-id"),
+  captureException: (...args: unknown[]) => mockCaptureException(...args),
+  captureEvent: (...args: unknown[]) => mockCaptureEvent(...args),
 }));
 
 // lib/crypto mock
@@ -76,6 +84,32 @@ import { GET } from "@/app/api/cron/reserve/route";
 function makeRequest(authHeader?: string): NextRequest {
   return new NextRequest("http://localhost:3000/api/cron/reserve", {
     headers: authHeader ? { authorization: authHeader } : {},
+  });
+}
+
+function makeReservation(overrides: Record<string, unknown> = {}) {
+  return {
+    id: 10,
+    student_id: "20001234",
+    room_id: "4",
+    reservation_date: "2026-03-26",
+    start_time: "14:00",
+    hours: 2,
+    reason: "스터디",
+    notification_email: null,
+    notification_discord_webhook: null,
+    reservation_credentials: [{ password: "encrypted-pw" }],
+    companions: [],
+    ...overrides,
+  };
+}
+
+function mockLoginSuccess() {
+  mockLoginToPortal.mockResolvedValue("sso-tok");
+  mockLoginToLibseat.mockResolvedValue({
+    phpSessId: "php-sess",
+    token: "tok",
+    studentName: "홍길동",
   });
 }
 
@@ -283,5 +317,109 @@ describe("GET /api/cron/reserve - DB 처리", () => {
 
     await GET(makeRequest("Bearer test-cron-secret"));
     expect(mockSendReservationDiscordNotification).not.toHaveBeenCalled();
+  });
+});
+
+describe("GET /api/cron/reserve - 상태 업데이트", () => {
+  it("성공 시 update 페이로드는 status와 booking_id만 포함", async () => {
+    mockSupabaseSelect.mockResolvedValue({
+      data: [makeReservation()],
+      error: null,
+    });
+    mockLoginSuccess();
+    mockSubmitReservation.mockResolvedValue({
+      success: true,
+      message: "예약 완료",
+    });
+
+    await GET(makeRequest("Bearer test-cron-secret"));
+    expect(mockReservationUpdate).toHaveBeenCalledTimes(1);
+    expect(mockReservationUpdate).toHaveBeenCalledWith({
+      status: "success",
+      booking_id: "RES-001",
+    });
+  });
+
+  it("booking_id 조회 실패 시 status만 update", async () => {
+    mockSupabaseSelect.mockResolvedValue({
+      data: [makeReservation()],
+      error: null,
+    });
+    mockLoginSuccess();
+    mockSubmitReservation.mockResolvedValue({
+      success: true,
+      message: "예약 완료",
+    });
+    mockFetchReserveNo.mockResolvedValue(undefined);
+
+    await GET(makeRequest("Bearer test-cron-secret"));
+    expect(mockReservationUpdate).toHaveBeenCalledWith({ status: "success" });
+  });
+
+  it("예약 실패 시 페이로드는 status만 포함하고 실패 사유는 Sentry로 보고", async () => {
+    mockSupabaseSelect.mockResolvedValue({
+      data: [makeReservation()],
+      error: null,
+    });
+    mockLoginSuccess();
+    mockSubmitReservation.mockResolvedValue({
+      success: false,
+      message: "이미 예약된 시간대",
+    });
+
+    await GET(makeRequest("Bearer test-cron-secret"));
+    // 스키마에 없는 error_message 컬럼을 보내지 않는다
+    expect(mockReservationUpdate).toHaveBeenCalledWith({ status: "failed" });
+    expect(mockCaptureEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        extra: expect.objectContaining({
+          reservationId: 10,
+          errorMessage: "이미 예약된 시간대",
+        }),
+      }),
+    );
+    // 실패한 예약의 슬롯 점유 해제
+    expect(mockSupabaseDelete).toHaveBeenCalled();
+  });
+
+  it("update 실패 시 1회 재시도하고, 재시도 성공이면 Sentry 보고 없음", async () => {
+    mockSupabaseSelect.mockResolvedValue({
+      data: [makeReservation()],
+      error: null,
+    });
+    mockLoginSuccess();
+    mockSubmitReservation.mockResolvedValue({
+      success: true,
+      message: "예약 완료",
+    });
+    mockSupabaseUpdate
+      .mockResolvedValueOnce({ error: { message: "transient error" } })
+      .mockResolvedValueOnce({ error: null });
+
+    await GET(makeRequest("Bearer test-cron-secret"));
+    expect(mockSupabaseUpdate).toHaveBeenCalledTimes(2);
+    expect(mockCaptureException).not.toHaveBeenCalled();
+  });
+
+  it("재시도까지 실패하면 Sentry.captureException 보고", async () => {
+    mockSupabaseSelect.mockResolvedValue({
+      data: [makeReservation()],
+      error: null,
+    });
+    mockLoginSuccess();
+    mockSubmitReservation.mockResolvedValue({
+      success: true,
+      message: "예약 완료",
+    });
+    mockSupabaseUpdate.mockResolvedValue({ error: { message: "db down" } });
+
+    await GET(makeRequest("Bearer test-cron-secret"));
+    expect(mockSupabaseUpdate).toHaveBeenCalledTimes(2);
+    expect(mockCaptureException).toHaveBeenCalledWith(
+      { message: "db down" },
+      expect.objectContaining({
+        extra: expect.objectContaining({ reservationId: 10 }),
+      }),
+    );
   });
 });

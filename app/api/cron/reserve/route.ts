@@ -221,7 +221,7 @@ export async function GET(request: NextRequest) {
             startTime: res.start_time,
             hours: res.hours,
           });
-          await updateStatus(res.id, "success", undefined, reserveNo);
+          await updateStatus(res.id, "success", reserveNo);
           results.push({
             reservationId: res.id,
             status: "success",
@@ -303,21 +303,42 @@ export async function GET(request: NextRequest) {
 async function updateStatus(
   reservationId: number,
   status: string,
-  errorMessage?: string,
   bookingId?: string,
 ) {
-  await supabase
+  const payload = {
+    status,
+    ...(bookingId && { booking_id: bookingId }),
+  };
+
+  let { error } = await supabase
     .from("reservations")
-    .update({
-      status,
-      ...(errorMessage && { error_message: errorMessage }),
-      ...(bookingId && { booking_id: bookingId }),
-    })
+    .update(payload)
     .eq("id", reservationId);
+
+  if (error) {
+    // 일시적 오류 대비 1회 재시도
+    ({ error } = await supabase
+      .from("reservations")
+      .update(payload)
+      .eq("id", reservationId));
+  }
+
+  if (error) {
+    console.error("예약 상태 업데이트 실패:", reservationId, error);
+    Sentry.captureException(error, {
+      extra: { reservationId, status, bookingId },
+    });
+  }
 }
 
 async function markFailed(reservationId: number, errorMessage: string) {
-  await updateStatus(reservationId, "failed", errorMessage);
+  await updateStatus(reservationId, "failed");
+  Sentry.captureEvent({
+    message: "크론 예약 실패",
+    level: "warning",
+    tags: { action: "cron_reserve" },
+    extra: { reservationId, errorMessage },
+  });
   // 실패한 예약의 슬롯 점유 해제
   await supabase
     .from("reserved_slots")
