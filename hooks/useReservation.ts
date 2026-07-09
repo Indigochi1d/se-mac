@@ -1,6 +1,7 @@
 import { useState, useEffect, useReducer, useMemo } from "react";
 import { STUDY_ROOMS } from "@/constants/studyroom";
 import { generateRecurringDates, getNextWeekDate } from "@/lib/date";
+import { isValidDiscordWebhookUrl } from "@/lib/notification";
 import type { Companion } from "@/components/reservation/CompanionInput";
 
 interface SubmitResult {
@@ -201,6 +202,14 @@ export const useReservation = () => {
       const totalPeople = companions.length + 1;
       if (totalPeople < selectedRoom.minPeople) return false;
       if (totalPeople > selectedRoom.maxPeople) return false;
+    }
+
+    if (
+      notificationMethod === "discord" &&
+      notificationDiscordWebhook.trim() &&
+      !isValidDiscordWebhookUrl(notificationDiscordWebhook)
+    ) {
+      return false;
     }
 
     return true;
